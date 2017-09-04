@@ -28,7 +28,11 @@ tasr - ?
 
 Map reads back to contigs to get stats. - skipp! This will not generate the maps that was originally created. 
 
-Try to find other ways to get statistics!
+Try to find other ways to get statistics for support!
+
+Genotyping and classify type of SV;
+From the mapped contigs a sam-file is generated. sam-file gives us information about direction of the reads and if they are matched or not matched to reference genome. 
+Looking at the NOT matched contigs (especially soft clippes), I will get information about a SV and where it starts and ends. If this is mapped inside our regions of interest, we will call it a SV. And if we also have a contig that maps as match (M) to the reference genome, we can classify it as a heterozygous SV.   
 
 
 
