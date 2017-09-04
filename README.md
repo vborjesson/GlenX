@@ -18,9 +18,17 @@ velveth velveth_out regionX.fasta
 abyss-pe k-50 name=name in=regionX.fasta
 spades.py --12 regionX.bam -o spades_out 
 
-bwa mem ref.fa assembled.fasta > aligned_assembled.sam
+bwa mem -x intractg ref.fa assembled.fasta > aligned_assambled.sam
 ```
-Velveth returns a fasta-file with all reads sorted, and after bwa I get a long sam-file
-Abyss returns resulting acaffolds as fasta; but how do I get statistics from this? 
-spades ??
-SSAKE ??  	
+Velveth returns a fasta-file with all reads sorted, and after bwa I get a long sam-file - multiple steps -> i think I will skipp this one!
+Abyss - returns nice contigs. One good Ide could be to map contigs from different kmers. But; how do I get statistics from this? Look at sam! 
+spades - finns på UPPMAX, ska testköra med inv_
+SSAKE - Returnerar fler och kortare contigs -> ska kolla igenom!
+tasr - ? 
+
+Map reads back to contigs to get stats. - skipp! This will not generate the maps that was originally created. 
+
+Try to find other ways to get statistics!
+
+
+
