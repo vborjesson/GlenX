@@ -25,7 +25,7 @@ bam = args.bam_in
 # All reads in these regions are then extracted from the BAM-file into a new region-specific BAM-file. 
 
 def region_bam (vcf, bam):
-	with open (vcf, "r") as vcf_in, open (bam, "r") as bam_in:
+	with open (vcf, "r") as vcf_in:
 		for line in vcf_in:
 			if line.startswith("#"):
 				continue 
@@ -47,8 +47,11 @@ def region_bam (vcf, bam):
 				start_b = start + 1000
 				end_a = end - 1000
 				end_b = end + 1000
+
 				print chrom, start_a, start_b, end_a, end_b 
 
+				subprocess.call('samtools view -b '+ str(annotation_script), shell=True, stdout=outfile)
+				print 'Annotation programs was added to the SVenX script'
 
 hej = region_bam(vcf, bam)
 	
