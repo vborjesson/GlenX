@@ -21,13 +21,20 @@ vcf = args.vcf_in
 bam = args.bam_in
 ID = args.ID
 
-################# FUNCTION - New BAM-file (called variant-region) ##################################
+################# FUNCTION - REGION SPECIFIC ASSEMBLY (called variant-region) ##################################
 
 # This function will generate a new bam file. For every called region; start-position +/- 1000bp and end-position +/- 1000bp are saved. 
-# All reads in these regions are then extracted from the BAM-file into a new region-specific BAM-file. 
+# All reads in these regions are then extracted from the BAM-file into a new region-specific BAM-file. This function will call a bah script 
+# that execute assembly, including converting bam to fasta, run assembly and mapping back to ref-genome. 
 
-def make_bam (vcf, bam, ID):
+
+def region_specific_assembly (vcf, bam, ID):
+	
 	counter = 0
+	subprocess.call ('mkdir ' + ID + '_bam', shell = True)
+	subprocess.call ('mkdir ' + ID + '_fasta', shell = True)
+	subprocess.call('chmod +x assembly.sh', shell=True)
+	
 	with open (vcf, "r") as vcf_in:
 		for line in vcf_in:
 			if line.startswith("#"):
@@ -54,33 +61,39 @@ def make_bam (vcf, bam, ID):
 				# uniqe ID for every region-specific bam-file	
 				counter += 1	# Unique ID 
 				region_ID = ID + "_region_" + str(counter)
-				
+				bam_file = ID + "_bam/" + region_ID + '.bam'
+				fasta_file = ID + "_fasta/" + region_ID + '.fasta'
+
 				posA = int(posA)
 				posB = int(posB)
 				posA_start = posA - 1000
 				posA_end = posA + 1000
 				posB_start = posB - 1000
-				posB_end = posB + 1000				  
+				posB_end = posB + 1000	
+				region2 = ""			  
 
 				# Check for overlapping regions (we do not want doubble reads)
 				if chromA == chromB:
 					if posA < posB:
 						if posA_end >= posB_start:
-							subprocess.call('samtools view -b ' + bam + ' "Chr' + str(chromA) + ':' + str(posA_start) + '-' + str(posB_end) + '" > ' + ID + "_bam/" + region_ID + '.bam', shell = True)
-							print 'a-b', posA, posB, chromA, posA_start, posB_end
-							continue
+							region = str(chromA) + ':' + str(posA_start) + '-' + str(posB_end)
+						else: 
+							region = str(chromA) + ':' + str(posA_start) + '-' + str(posA_end) 
+							region2 = str(chromB) + ':' + str(posB_start) + '-' + str(posB_end)
+
 					if posA > posB:
 						if posB_end >= posA_start:
-							subprocess.call('samtools view -b ' + bam + ' "Chr' + str(chromA) + ':' + str(posB_start) + '-' + str(posA_end) + '" > ' + ID + "_bam/" + region_ID + '.bam', shell= True)
-							print "b-a", posA, posB, chromA, posB_start, posA_end
-							continue					
+							region = str(chromA) + ':' + str(posB_start) + '-' + str(posA_end)
+						else:
+							region = str(chromA) + ':' + str(posA_start) + '-' + str(posA_end) 
+							region2 = str(chromB) + ':' + str(posB_start) + '-' + str(posB_end)				
 				else:
-					subprocess.call('samtools view -b ' + bam + ' "Chr' + str(chromA) + ':' + str(posA_start) + '-' + str(posA_end) + '"' + ' "Chr' + str(chromB) + ':' + str(posB_start) + '-' + str(posB_end) + '" > ' + ID + "_bam/" + region_ID + '.bam', shell=True) #, stdout=outfile)
-					print posA, posB, chromA, posA_start, posA_end, chromB, posB_start, posB_end
+					region = str(chromA) + ':' + str(posA_start) + '-' + str(posA_end)
+					region2 = str(chromB) + ':' + str(posB_start) + '-' + str(posB_end)
+					
+				subprocess.call('./assembly.sh ' + bam + ' ' + region + ' ' + bam_file + ' ' + fasta_file + ' ' + ID + ' ' + region2, shell = True)
 
-subprocess.call ('mkdir ' + ID + '_bam', shell = True)
-#subprocess.call ('samtools index ' + bam, shell = True)
-hej = make_bam (vcf, bam, ID)
+hej = region_specific_assembly (vcf, bam, ID)
 
 
 
