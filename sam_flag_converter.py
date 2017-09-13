@@ -17,6 +17,9 @@ flag = args.flag
 ################ FUNCTION - BAM-FLAG converter ###############################
 
 # Convert bam-flag to binary numbers and check if 2^4 (reverse strand) is present or not.
+# Binary numbers with factor 2, backwards: 2^0, 2^1, 2^2, 2^3, 2^4 .. 2^n. In the list created below; if the 
+# the first position (binary_list[0]) is 1, this means that 2^0 = 1 is present. So we will check if position 5
+# (binary_list[4]) is 1 or 0, if it is 1 this means that 2^4 = 16 exist and strand is reverse.  
 
 def bam_flag (number):
 	binary_list = [] 
