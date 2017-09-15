@@ -104,7 +104,8 @@ def region_specific_assembly (vcf, bam, ID):
 ########################################### FUNCTION - GENOTYPE CALLER ########################################################################
 
 def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end):
-	arr = np.empty((0,3), int)
+	s_arr = np.empty((0,6), int) # Soft clipping alignment
+	m_arr = np.empty((0,4), int) # matched alignment
 	with open (sam, "r") as sam_in:
 		for line in sam_in:
 			if line[0] == "@":
@@ -120,7 +121,11 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 					alt = info[-1].split(",")
 					alt_chromB = int(alt[0]) # alternative chromosome position 
 					alt_posB = alt[1]
-					alt_strandB = alt[2] 
+					alt_strandB = alt[2]
+					if alt_strandB == '-':
+						alt_strandB = 1
+					elif alt_strandB == '+':
+						alt_strandB = 0	 
 					
 					# print alt_chromA, chromA, alt_chromB, chromB
 					
@@ -133,8 +138,7 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 						elif int(alt_posA) >= posB_start and int(alt_posA) <= posB_end and int(alt_posB) >= posA_start and int(alt_posB) <= posA_end:
 							region = True	
 					
-					elif alt_chromA == chromB and alt_chromB == chromA:	
-						print 'ja2'
+					elif alt_chromA == chromB and alt_chromB == chromA:
 						if alt_posA >= posB_start and alt_posA <= posB_end and alt_posB >= posA_start and alt_posB <= posA_end:
 							region = True	
 
@@ -175,15 +179,52 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 								bp_positionB = ''.join([i for i in v if i.isdigit()])
 								bp_positionB = int (bp_positionB)
 
-						print alt_strandA, breakpointA, alt_strandB, breakpointB
+						#print alt_strandA, breakpointA, alt_strandB, breakpointB
 		
 					#print line
 
-		arr = np.append(arr, np.array([[1,2,3]]), axis=0)
-		arr = np.append(arr, np.array([[4,5,6]]), axis=0)
-	print arr	
+						s_arr = np.append(s_arr, np.array([[alt_strandA, alt_chromA, breakpointA, alt_strandB, alt_chromB, breakpointB]]), axis=0)
+				
+				elif 'M' in line[5]:
+					cigar = line[5].replace('M', '') # Check if only M cigar 
+					if cigar.isdigit():
+						match_contig = int(cigar)
+						m_strand = bam_flag(line[1])
+						m_chrom = int(line[2])
+						m_pos_start = int(line[3])
+						m_pos_end = 0
+						m_pos_end += int(m_pos_start)
+						m_pos_end += match_contig
+						m_arr = np.append(m_arr, np.array([[m_strand,m_chrom,m_pos_start,m_pos_end]]), axis=0)
+						#print match_contig, m_strand	
 
+	# if no breakpoints count be found, skip this variant!					
+	if len(s_arr) == 0:
+		print 'no breakpoints could be found'
+		return 'N/A' 
 
+	#print m_arr, s_arr	
+
+	# Check is there is a matching contig to ref, that will span over the predicted breakpoint. If there is; The genotype will be 
+	# classified as heterozygot. If we cant find any matching contig spanning the breakpoint, we classify this as homozygous  
+	genotype = ""
+	for row in m_arr:
+		if row[1] == s_arr[0][1] and s_arr[0][2] > row[2] and s_arr[0][2] < row[3]:
+			genotype = "0/1"
+	if genotype == "":
+		genotype = "1/1"
+
+	sv_info = s_arr[0]	
+
+	# classify SV. 	
+	if sv_info[1] != sv_info[4]:
+		sv_type = "BND"
+	if sv_info[1] == sv_info[4]:
+		if sv_info[0] != sv_info[3]:
+			sv_type = "INV"
+		#elif 	 	
+
+	print genotype	
 
 ################ FUNCTION - BAM-FLAG converter ###############################
 
@@ -209,11 +250,12 @@ def bam_flag (number):
 	
 	# Check if the fifth number (2^4) backwards in binary_list is a 1 
 	# print binary_list[4]
-
-	if binary_list[4] == 1:
-		return "-"
-	if binary_list[4] == 0:
-		return "+"	
+	if len(binary_list) >= 5:
+		if binary_list[4] == 1:
+			return 1	
+	else:
+		return 0
+				
 
 
 
