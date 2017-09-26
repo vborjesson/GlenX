@@ -21,6 +21,7 @@ parser.add_argument('--bam', dest='bam_in', help = 'Path to bam-file', required=
 parser.add_argument('--tab', dest='tab_in', help = 'Path to tab_file', required= False)
 parser.add_argument('--ID', dest='ID', help= 'sample ID', required = False)
 parser.add_argument('--sam', dest='sam', help= 'path to sam-file for dry run', required=False)
+parser.add_argument('--fa', dest= 'fa', help= 'Path to fasta-file with contigs generated from abyss', required = False)
 
 args = parser.parse_args()
 
@@ -29,7 +30,7 @@ bam = args.bam_in
 tab = args.tab_in
 ID = args.ID
 sam = args.sam
-
+fasta = args.fa
 
 ################# FUNCTION - REGION SPECIFIC ASSEMBLY (called variant-region) ##################################
 
