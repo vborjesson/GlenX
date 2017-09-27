@@ -1,9 +1,12 @@
 #!/usr/bin/python 
+import scipy
+from scipy.stats import norm
+import numpy as np
+from numpy import loadtxt, float32, dtype, int32
+import warnings
+import matplotlib.pyplot as plt
 
-def tab_array (tab_file):
-	import numpy as np
-	from numpy import loadtxt, float32, dtype, int32
-	import warnings	
+def tab_array (tab_file):	
 	
 	with open (tab_file, 'r') as tab_in:
 
@@ -16,21 +19,19 @@ def tab_array (tab_file):
 
 		tab_array = loadtxt(tab_in, dtype=data_dtype,delimiter='\t', skiprows=1)
 
-	np.seterr(divide='ignore', invalid='ignore')
 
-	with warnings.catch_warnings():
-		warnings.simplefilter("ignore", category=RuntimeWarning)
-	
-		chromosome_coverage = {}
+	return tab_array	
 
-		for a in range(1,23):
-			a = str(a)
-			chrom_num = tab_array['CHR'] == a
-			cov_av = (tab_array['coverage'][chrom_num].mean())
-			chromosome_coverage[a] = cov_av	
+# get mean and standard deviation for read coverage over the entire chromosome
+def normal_distr(tab_array, chromosome):
+	chr_data = tab_array['CHR'] == chromosome
+	cov_data = tab_array['coverage'][chr_data]
+	data = np.delete(cov_data, 0)
+	mu_chr_cov, std_chr_cov = norm.fit(data)
 
-	return tab_array, chromosome_coverage	
-
-
-
+	'''
+	mu_chr_cov = (tab_array['coverage'][data].mean())
+	std_chr_cov = (tab_array['coverage'][data].std())
+	'''
+	return mu_chr_cov, std_chr_cov
 	

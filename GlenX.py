@@ -8,7 +8,8 @@ import math
 import numpy as np
 from numpy import loadtxt, dtype,float32
 import warnings
-from create_tab_array import tab_array
+from create_tab_array import tab_array, normal_distr
+from scipy.stats import norm
 
 ################# ARGPARSER ######################
 
@@ -21,7 +22,7 @@ parser.add_argument('--bam', dest='bam_in', help = 'Path to bam-file', required=
 parser.add_argument('--tab', dest='tab_in', help = 'Path to tab_file', required= False)
 parser.add_argument('--ID', dest='ID', help= 'sample ID', required = False)
 parser.add_argument('--sam', dest='sam', help= 'path to sam-file for dry run', required=False)
-parser.add_argument('--fa', dest= 'fa', help= 'Path to fasta-file with contigs generated from abyss', required = False)
+#parser.add_argument('--fa', dest= 'fa', help= 'Path to fasta-file with contigs generated from abyss', required = False)
 
 args = parser.parse_args()
 
@@ -30,7 +31,7 @@ bam = args.bam_in
 tab = args.tab_in
 ID = args.ID
 sam = args.sam
-fasta = args.fa
+#fasta = args.fa
 
 ################# FUNCTION - REGION SPECIFIC ASSEMBLY (called variant-region) ##################################
 
@@ -40,7 +41,7 @@ fasta = args.fa
 # This function will generate a sam-file. 
 
 
-def region_specific_assembly (vcf, bam, ID):
+def region_specific_assembly (vcf, bam, ID, tab_array):
 	
 	counter = 0
 	subprocess.call ('mkdir ' + ID + '_bam', shell = True)
@@ -105,7 +106,10 @@ def region_specific_assembly (vcf, bam, ID):
 				else:
 					region = str(chromA) + ':' + str(posA_start) + '-' + str(posA_end)
 					region2 = str(chromB) + ':' + str(posB_start) + '-' + str(posB_end)
-					
+				
+				# average chromosome coverage divided in four, will give us a threshold of minimum read coverage that will be returned
+				cov_med = np.median(tab_array['coverage'])
+				print cov_med
 				subprocess.call('./assembly.sh ' + bam + ' ' + region + ' ' + bam_file + ' ' + fasta_file + ' ' + sam_file + ' ' + assembly_map + ' ' + bwa_ref + ' ' + region_ID + ' ' + region2, shell = True)
 
 	return chromA, chromB, posB_start, posA_end, posB_start, posB_end
@@ -113,7 +117,7 @@ def region_specific_assembly (vcf, bam, ID):
 
 ########################################### FUNCTION - GENOTYPE CALLER ########################################################################
 
-def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, tab_array, chrom_cover):
+def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, tab_array):
 	s_arr = np.empty((0,12), int) # Soft clipping alignment
 	m_arr = np.empty((0,4), int) # matched alignment
 	with open (sam, "r") as sam_in:
@@ -189,7 +193,7 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 						##############################################
 						##################################################
 
-						# Tiddit generates coverage information for every 100 bp. Therefore we will round down to nearest hundred and up to nearest hundred to get
+						# TIDDIT generates coverage information for every 100 bp. Therefore we will round down to nearest hundred and up to nearest hundred to get
 						# specific region of interest, the calculate the average coverage for that region.  
 						round_down_breakA = breakA/1000
 						round_down_breakA = int (round_down_breakA) * 1000
@@ -228,11 +232,10 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 					match_region_end += match_region_start
 					match_region_end += count_match_pos	
 					m_arr = np.append(m_arr, np.array([[strandA, alt_chrA, match_region_start, match_region_end]]), axis=0)
-	print s_arr
-	print m_arr							
+	#print s_arr
+	#print m_arr							
 
 	# if no breakpoints could be found, skip this variant!					
-	
 	if len(s_arr) == 0:
 		print 'no breakpoints could be found'
 		return 'N/A'
@@ -243,45 +246,46 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 		Q_scoring = {}
 		counter = 0
 		for row in s_arr:
-			Qscore = 0
-			if row[3] == 60: # map quality 
-				Qscore += 10
-			elif row[3] == 0:
-				Qscore -= 10
-			elif row[3] < 10: 
-				Qscore == 2
-			elif row[3] >= 10:
-				Qscore += 5	
-			if row[10] == 3: # cigar length generates penalty scores
-				Qscore -= 5
-			if row[10] >= 4:
-				Qscore -= 10
-			contig_score = int(row[11]) / 100 * float(1.5) + 5	
-			Qscore += contig_score
+			# Standardize in range 0 - 60 and weight   
+			Q_length = (((int(row[11]) - 0) * (60 - 0)) / (2000 - 0)) + 0
+			Weight = 20
+			Q_qscore = ((((int(row[3])+int(row[8])) - 0) * (60 - 0)) / (120 - 0)) + 0
+			if int(row[10]) >= 5:
+				if row[10] <= 7:
+					Q_cigar = 60
+				elif row[10] >= 8:
+					Q_cigar = 120	
+			else: 
+				Q_cigar = 0
+			Qscore = (Q_length * Weight) + Q_qscore - Q_cigar  		
 			Q_scoring[counter] = Qscore		
 			counter += 1
 
-	print Q_scoring		
+	# Best scoring breakpoint prediction		
+	best_breakpoint = max(Q_scoring, key=Q_scoring.get)
 
-
-	# Check if there is a matching contig to ref, that will span over the predicted breakpoint. If there is; The genotype will be 
-	# classified as heterozygous. If we cant find any matching contig spanning the breakpoint, we classify this as homozygous  
+	# Check if there is a matching contig to ref that will span over the predicted breakpoint. If there is; The genotype will be 
+	# classified as heterozygous. If we can't find any matching contig spanning the breakpoint, we classify this as homozygous  
 	genotype = ""
 	for row in m_arr:
-		if row[1] == s_arr[0][1] and s_arr[0][2] > row[2] and s_arr[0][2] < row[3]:
+		if row[1] == s_arr[best_breakpoint][1] and s_arr[best_breakpoint][2] > row[2] and s_arr[best_breakpoint][2] < row[3]:
 			genotype = "0/1"
 	if genotype == "":
 		genotype = "1/1"
 
-	sv_info = s_arr[0]	
+	sv_info = s_arr[best_breakpoint]
+	print sv_info
 
 	# classify SV. 	
-	if sv_info[1] != sv_info[5]:
+	if sv_info[1] != sv_info[6]: # breakpoints are located on different chromosomes -> break end
 		sv_type = "BND"
-	if sv_info[1] == sv_info[5]:
-		if sv_info[0] != sv_info[4]:
+		print 'BND'
+	if sv_info[1] == sv_info[6]: # breakpoints are located on the same chromosome
+		mu_chr, std_chr = normal_distr(tab_arr, sv_info[1])
+		if sv_info[0] != sv_info[5]: # sequences are in opposite directions -> inversed  
 			sv_type = "INV"
-		#elif 	 	
+		print mu_chr, std_chr	
+		print sv_info[4], sv_info[9]   # compare average read coverage for that chromosome, and for breakpoint-region    	 	
 
 	print genotype	
 
@@ -316,6 +320,9 @@ def bam_flag (number):
 	else:
 		return 0
 
+
+############################ FUNCTION - CIGAR counter #################################
+
 # short function to count cigar field with soft clipping				
 def cigar_count (cigar, strandA):
 	n_bp = 0 # number of basepairs from start_pos
@@ -346,6 +353,7 @@ def cigar_count (cigar, strandA):
 	return n_bp, cigar_l		
 
 
+
 ##### TEST DATA ######
 chromA = 11
 chromB = 11
@@ -353,17 +361,15 @@ posA_start = 26503276
 posA_end = 26505276
 posB_start = 30894624
 posB_end = 30896624
+
 # chromA, chromB, posB_start, posA_end, posB_start, posB_end = region_specific_assembly (vcf, bam, ID)
 
 # Make an array from tab file containing read coverage information and average chromosome-specific coverage.  
-tab_arr, chromosome_coverage = tab_array(tab)	
+tab_arr = tab_array(tab)	
+
+#
+# assembly = region_specific_assembly (vcf, bam, ID, tab_arr)
 
 # Check if SVs are supported in de novo assemby, classify SV type and genotype.  
-call_genotype = genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, tab_arr, chromosome_coverage)
-
-#print chromosome_coverage
-
-cov_chr = tab_arr['CHR'] == '1' 
-cov_pos = tab_arr['start'] == 30895000
-#print (tab_arr['coverage'][cov_pos])
+call_genotype = genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, tab_arr)
 
