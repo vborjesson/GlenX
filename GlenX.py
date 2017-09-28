@@ -8,7 +8,7 @@ import math
 import numpy as np
 from numpy import loadtxt, dtype,float32
 import warnings
-from create_tab_array import tab_array, normal_distr
+from create_tab_array import tab_array
 from scipy.stats import norm
 
 ################# ARGPARSER ######################
@@ -107,10 +107,11 @@ def region_specific_assembly (vcf, bam, ID, tab_array):
 					region = str(chromA) + ':' + str(posA_start) + '-' + str(posA_end)
 					region2 = str(chromB) + ':' + str(posB_start) + '-' + str(posB_end)
 				
-				# average chromosome coverage divided in four, will give us a threshold of minimum read coverage that will be returned
-				cov_med = np.median(tab_array['coverage'])
-				print cov_med
-				subprocess.call('./assembly.sh ' + bam + ' ' + region + ' ' + bam_file + ' ' + fasta_file + ' ' + sam_file + ' ' + assembly_map + ' ' + bwa_ref + ' ' + region_ID + ' ' + region2, shell = True)
+				# median chromosome coverage divided in four, will give us a threshold of minimum read coverage that will be returned
+				cov_med = np.median(tab_arr['coverage'])
+				# minimum kmer coverage
+				min_cov = cov_med / 4
+				subprocess.call('./assembly.sh ' + bam + ' ' + region + ' ' + ID + ' ' + bwa_ref + ' ' + region_ID + ' ' + min_cov + ' ' + region2, shell = True)
 
 	return chromA, chromB, posB_start, posA_end, posB_start, posB_end
 	
@@ -279,15 +280,12 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 	# classify SV. 	
 	if sv_info[1] != sv_info[6]: # breakpoints are located on different chromosomes -> break end
 		sv_type = "BND"
-		print 'BND'
 	if sv_info[1] == sv_info[6]: # breakpoints are located on the same chromosome
-		mu_chr, std_chr = normal_distr(tab_arr, sv_info[1])
 		if sv_info[0] != sv_info[5]: # sequences are in opposite directions -> inversed  
 			sv_type = "INV"
-		print mu_chr, std_chr	
-		print sv_info[4], sv_info[9]   # compare average read coverage for that chromosome, and for breakpoint-region    	 	
+		#print sv_info[4], sv_info[9]   # compare average read coverage for that chromosome, and for breakpoint-region    	 	
 
-	print genotype	
+	print 'genomtype: ', genotype, 'type: ', sv_type	
 
 ################ FUNCTION - BAM-FLAG converter ###############################
 
@@ -366,7 +364,10 @@ posB_end = 30896624
 
 # Make an array from tab file containing read coverage information and average chromosome-specific coverage.  
 tab_arr = tab_array(tab)	
-
+cov_med = np.median(tab_arr['coverage'])
+# minimum kmer coverage
+min_cov = cov_med / 4
+print 'cov med', cov_med, 'min_cov', min_cov
 #
 # assembly = region_specific_assembly (vcf, bam, ID, tab_arr)
 
