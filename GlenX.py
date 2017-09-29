@@ -22,6 +22,7 @@ parser.add_argument('--bam', dest='bam_in', help = 'Path to bam-file', required=
 parser.add_argument('--tab', dest='tab_in', help = 'Path to tab_file', required= False)
 parser.add_argument('--ID', dest='ID', help= 'sample ID', required = False)
 parser.add_argument('--sam', dest='sam', help= 'path to sam-file for dry run', required=False)
+parser.add_argument('--bwa_ref', dest='bwa_ref', help = 'Path to reference genome for bwa mem', required=False)
 #parser.add_argument('--fa', dest= 'fa', help= 'Path to fasta-file with contigs generated from abyss', required = False)
 
 args = parser.parse_args()
@@ -31,6 +32,7 @@ bam = args.bam_in
 tab = args.tab_in
 ID = args.ID
 sam = args.sam
+bwa_ref = args.bwa_ref
 #fasta = args.fa
 
 ################# FUNCTION - REGION SPECIFIC ASSEMBLY (called variant-region) ##################################
@@ -41,8 +43,8 @@ sam = args.sam
 # This function will generate a sam-file. 
 
 
-def region_specific_assembly (vcf, bam, ID, tab_array):
-	
+def region_specific_assembly (vcf, bam, ID, tab_array, bwa_ref):	
+
 	counter = 0
 	subprocess.call ('mkdir ' + ID + '_bam', shell = True)
 	subprocess.call ('mkdir ' + ID + '_fasta', shell = True)
@@ -50,6 +52,8 @@ def region_specific_assembly (vcf, bam, ID, tab_array):
 	subprocess.call('chmod +x assembly.sh', shell=True)
 	
 	with open (vcf, "r") as vcf_in:
+		print 'Reading VCF for region-specific assembly'
+
 		for line in vcf_in:
 			if line.startswith("#"):
 				continue 
@@ -75,10 +79,8 @@ def region_specific_assembly (vcf, bam, ID, tab_array):
 				# unique ID for every region-specific bam-file	
 				counter += 1	# Unique ID 
 				region_ID = ID + "_region_" + str(counter)
-				bam_file = ID + "_bam/" + region_ID + '.bam'
-				fasta_file = ID + "_fasta/" + region_ID + '.fasta'
-				sam_file = region_ID + '.sam'
 				assembly_map = ID + '_assembly'
+				
 
 				posA = int(posA)
 				posB = int(posB)
@@ -111,15 +113,23 @@ def region_specific_assembly (vcf, bam, ID, tab_array):
 				cov_med = np.median(tab_arr['coverage'])
 				# minimum kmer coverage
 				min_cov = cov_med / 4
-				subprocess.call('./assembly.sh ' + bam + ' ' + region + ' ' + ID + ' ' + bwa_ref + ' ' + region_ID + ' ' + min_cov + ' ' + region2, shell = True)
+				print 'Minimum coverage accepted: ', min_cov
+				print 'Initiate de novo assembly and mapping contigs back to reference'
+				process = ['./assembly.sh', bam, region, ID, region_ID, str(min_cov), bwa_ref, region2]
+				os.system(" ".join(process))
+				#subprocess.call('./assembly.sh ' + bam + ' ' + region + ' ' + ID  + ' ' + region_ID + ' ' + min_cov + ' ' + bwa_mem + ' ' + region2, shell = True)
+				sam = assembly_map + '/' + region_ID + '_mapped.sam'
 
-	return chromA, chromB, posB_start, posA_end, posB_start, posB_end
+			call_genotype = genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, tab_arr)	
+
+
+	return 'KLART'
 	
 
 ########################################### FUNCTION - GENOTYPE CALLER ########################################################################
 
 def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, tab_array):
-	s_arr = np.empty((0,12), int) # Soft clipping alignment
+	s_arr = np.empty((0,13), int) # Soft clipping alignment
 	m_arr = np.empty((0,4), int) # matched alignment
 	with open (sam, "r") as sam_in:
 		for line in sam_in:
@@ -129,13 +139,15 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 				continue
 			else:
 				line = line.upper().split("\t")
-				alt_chrA = int(line[2])
+				alt_chrA = line[2]
 				contig_start = int(line[3]) # start position for contig
 				map_scoreA = int(line[4]) 
 				cigar = line[5]
 				strandA = bam_flag(line[1])
 				
 				if "S" in cigar:
+					bad_quality = False # If there are several possible mate-mapping positions, this will be classified as bad quality and we will ignore these Breakpoints 
+					SA = False# Second mapping position
 					count_split_posA, cigar_length_posA = cigar_count (cigar, strandA)
 					#print count_split_posA, cigar_length_posA
 					breakA += int(contig_start) # Breakpoint A  		
@@ -143,11 +155,14 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 
 					# look at mate position of split reads. Can be found at optional field starting with SA
 					for field in line:
+						print field
+						#print line
 						if field.startswith("SA:"):
 							split_info = field.split(":")
 							positions = split_info[-1]
 							n_position = positions.split(";") # split into number of positions. If more than one alternative position, skip! 
 							if len(n_position) > 2:
+								bad_quality = True
 								break
 							position = n_position[0].split(",")
 							alt_chrB = int(position[0])
@@ -163,11 +178,17 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 					
 							breakB += int(mate_pos_start)
 							breakB += count_split_posB
+							SA = True
+							
 
 						if field.startswith("AS:"):
 							field = field.split(":")
 							contig_l = field[-1]
 
+					if bad_quality:
+						continue
+					if SA is False: # If the split contig have no second mapping place, continue
+						continue			
 					# count number of cigars, more cigars indicates untrustworthy SV. 
 					cigar_length = 0
 					cigar_length += cigar_length_posA
@@ -222,8 +243,8 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 
 						#print cov1_breakA, cov2_breakA, cov1_breakB, cov2_breakB
 						#print 'cov break A, B', av_cov_breakA, av_cov_breakB	
-						
-						s_arr = np.append(s_arr, np.array([[strandA, alt_chrA, breakA, map_scoreA, av_cov_breakA, strandB, alt_chrB, breakB, map_scoreB, av_cov_breakB, cigar_length, contig_l]]), axis=0)	
+						seq = line[8]
+						s_arr = np.append(s_arr, np.array([[strandA, alt_chrA, breakA, map_scoreA, av_cov_breakA, strandB, alt_chrB, breakB, map_scoreB, av_cov_breakB, cigar_length, contig_l, seq]]), axis=0)	
 					
 				elif "M" in cigar:
 					count_match_pos, cigar_length_m = cigar_count (cigar, strandA) # count the number of base pairs that match to reference genome
@@ -240,6 +261,7 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 	if len(s_arr) == 0:
 		print 'no breakpoints could be found'
 		return 'N/A'
+
 
 	# If several predicted SVs in s_arr; compare them and choose the one that seems most trustworthy. 
 	# Use map_score, cigar length, contig length and read coverage over breakpoints.
@@ -261,6 +283,7 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 			Qscore = (Q_length * Weight) + Q_qscore - Q_cigar  		
 			Q_scoring[counter] = Qscore		
 			counter += 1
+		
 
 	# Best scoring breakpoint prediction		
 	best_breakpoint = max(Q_scoring, key=Q_scoring.get)
@@ -285,7 +308,7 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 			sv_type = "INV"
 		#print sv_info[4], sv_info[9]   # compare average read coverage for that chromosome, and for breakpoint-region    	 	
 
-	print 'genomtype: ', genotype, 'type: ', sv_type	
+	print 'genotype: ', genotype, 'type: ', sv_type	
 
 ################ FUNCTION - BAM-FLAG converter ###############################
 
@@ -364,13 +387,9 @@ posB_end = 30896624
 
 # Make an array from tab file containing read coverage information and average chromosome-specific coverage.  
 tab_arr = tab_array(tab)	
-cov_med = np.median(tab_arr['coverage'])
-# minimum kmer coverage
-min_cov = cov_med / 4
-print 'cov med', cov_med, 'min_cov', min_cov
-#
-# assembly = region_specific_assembly (vcf, bam, ID, tab_arr)
+
+assembly = region_specific_assembly (vcf, bam, ID, tab_arr, bwa_ref)
 
 # Check if SVs are supported in de novo assemby, classify SV type and genotype.  
-call_genotype = genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, tab_arr)
+# call_genotype = genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, tab_arr)
 

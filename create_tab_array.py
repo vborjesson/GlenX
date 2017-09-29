@@ -6,7 +6,7 @@ from numpy import loadtxt, float32, dtype, int32
 def tab_array (tab_file):	
 
 	with open (tab_file, 'r') as tab_in:
-
+		print 'Creating array with read coverage information...'
 		header = tab_in.readline()
 		fields = header.split()
 
@@ -15,7 +15,7 @@ def tab_array (tab_file):
 
 		tab_array = loadtxt(tab_in, dtype=data_dtype,delimiter='\t', skiprows=1)
 
-
+	print 'Array completed'	
 	return tab_array	
 
 #### SKIP THIS! 
