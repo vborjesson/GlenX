@@ -155,7 +155,7 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 
 					# look at mate position of split reads. Can be found at optional field starting with SA
 					for field in line:
-						print field
+						#print field
 						#print line
 						if field.startswith("SA:"):
 							split_info = field.split(":")
@@ -245,7 +245,8 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 						#print 'cov break A, B', av_cov_breakA, av_cov_breakB	
 						seq = line[8]
 						s_arr = np.append(s_arr, np.array([[strandA, alt_chrA, breakA, map_scoreA, av_cov_breakA, strandB, alt_chrB, breakB, map_scoreB, av_cov_breakB, cigar_length, contig_l, seq]]), axis=0)	
-					
+						print s_arr 
+						
 				elif "M" in cigar:
 					count_match_pos, cigar_length_m = cigar_count (cigar, strandA) # count the number of base pairs that match to reference genome
 					# print count_match_pos, cigar_length_m
