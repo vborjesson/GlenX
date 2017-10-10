@@ -3,6 +3,27 @@ Tool for better genotyping of whole genome sequencing (WGS) data.
 
 ![alt text](https://github.com/vborjesson/GlenX/blob/master/Glen.png)
 
+Takes an vcf, bam and tab-file with read depth per 100 bp as input. 
+
+dependencies: 
+	GlenX uses three different assembly tools for de novo assemly and mapping; abyss, velveth, SSAKE, BWA and samtools. All these softwares needs to be installed. 
+	You will also need a SQlite-database with reference genome GC-content and mappability score / 100bp. Look at; Create database. 
+
+## Create database
+requirements; pandas, numpy
+An database needs to be created in order for normalization of data before analyses can be done. Download mappability scores for reference genome hg19 from rohsdb.cmb.usc.edu/GBshape/cgi-bin/hgFileUi?db=hg19&g=wgEncodeMapability and convert the bigwig file to readable bedGraph. Do also download the hg19 reference genome. 
+
+```
+python gc_map_array.py --hg19 /path/to/refgenome --bed /path/to/bedGraph
+```
+This will create a normalization.db database in the GlenX directory
+
+## Run GlenX
+```
+python GlenX --vcf --bam --tab --bwa_ref --norm_db
+```
+This will generate a vcf file with new predicted breakpoints, genotyping and SV classification. 
+
 ### Startup project: 
 Try to find a good de novo assembly tool. I try Velvet, abyss and spades. To align the assembled reads (scaffolds) back to the ref genome again, I use bwa mem. 
 
@@ -69,7 +90,8 @@ ongoing, problems with installing nextflow
 -> 		Take care of biases. Normalize data. GC-bias and  mappability. make script to do a table (array 2*many) with the data. Run before GlenX. 
 
 
-Meeting 4th of October:
+Meeting 4th of October: - done!
+
 Installing Anaconda in order for svdb to work.
 Transfer simulated 10x-data to Bianca. 
 Transfer SVDB to SVenX Bianca.

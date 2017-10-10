@@ -17,12 +17,13 @@ usage = '''GlenX takes vcf- and bam-files as input and improve the prediction of
 
 parser = argparse.ArgumentParser(description=usage)
 
-parser.add_argument('--vcf', dest='vcf_in', help = 'Path to vcf-file', required= False)
-parser.add_argument('--bam', dest='bam_in', help = 'Path to bam-file', required= False)
-parser.add_argument('--tab', dest='tab_in', help = 'Path to tab_file', required= False)
+parser.add_argument('--vcf', dest='vcf_in', help = 'Path to vcf-file', required= True)
+parser.add_argument('--bam', dest='bam_in', help = 'Path to bam-file', required= True) 
+parser.add_argument('--tab', dest='tab_in', help = 'Path to tab_file', required= True)
+parser.add_argument('--norm_db', dest='norm_db', help = 'Path normalization.db', required= False)
 parser.add_argument('--ID', dest='ID', help= 'sample ID', required = False)
 parser.add_argument('--sam', dest='sam', help= 'path to sam-file for dry run', required=False)
-parser.add_argument('--bwa_ref', dest='bwa_ref', help = 'Path to reference genome for bwa mem', required=False)
+parser.add_argument('--bwa_ref', dest='bwa_ref', help = 'Path to reference genome for bwa mem', required=True)
 #parser.add_argument('--fa', dest= 'fa', help= 'Path to fasta-file with contigs generated from abyss', required = False)
 
 args = parser.parse_args()
@@ -49,9 +50,10 @@ def region_specific_assembly (vcf, bam, ID, tab_array, bwa_ref):
 	subprocess.call ('mkdir ' + ID + '_bam', shell = True)
 	subprocess.call ('mkdir ' + ID + '_fasta', shell = True)
 	subprocess.call ('mkdir ' + ID + '_assembly', shell = True)
+	subprocess.call ('mkdir ' + ID + '_GlenX_out', shell = True)
 	subprocess.call('chmod +x assembly.sh', shell=True)
 	
-	with open (vcf, "r") as vcf_in:
+	with open (vcf, "r") as vcf_in, open (ID + '_GlenX_out/' + ID + '_GlenX.vcf', 'w') as f_out:
 		print 'Reading VCF for region-specific assembly'
 
 		for line in vcf_in:
@@ -120,8 +122,8 @@ def region_specific_assembly (vcf, bam, ID, tab_array, bwa_ref):
 				#subprocess.call('./assembly.sh ' + bam + ' ' + region + ' ' + ID  + ' ' + region_ID + ' ' + min_cov + ' ' + bwa_mem + ' ' + region2, shell = True)
 				sam = assembly_map + '/' + region_ID + '_mapped.sam'
 
-			call_genotype = genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, tab_arr)	
-
+			sv_info, genotype, sv_type = genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, tab_arr)	
+			f_out.write(sv_info, genotype, sv_type)
 
 	return 'KLART'
 	
@@ -140,6 +142,8 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 			else:
 				line = line.upper().split("\t")
 				alt_chrA = line[2]
+				if len(alt_chrA) >= 3: # if the chromosome number is longer than 2 letters, it will be invalid
+					continue
 				contig_start = int(line[3]) # start position for contig
 				map_scoreA = int(line[4]) 
 				cigar = line[5]
@@ -165,6 +169,7 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 								bad_quality = True
 								break
 							position = n_position[0].split(",")
+							print position
 							alt_chrB = int(position[0])
 							mate_pos_start = position[1] 
 							# strand 
@@ -246,7 +251,7 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 						seq = line[8]
 						s_arr = np.append(s_arr, np.array([[strandA, alt_chrA, breakA, map_scoreA, av_cov_breakA, strandB, alt_chrB, breakB, map_scoreB, av_cov_breakB, cigar_length, contig_l, seq]]), axis=0)	
 						print s_arr 
-						
+						 
 				elif "M" in cigar:
 					count_match_pos, cigar_length_m = cigar_count (cigar, strandA) # count the number of base pairs that match to reference genome
 					# print count_match_pos, cigar_length_m
@@ -299,7 +304,7 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 		genotype = "1/1"
 
 	sv_info = s_arr[best_breakpoint]
-	print sv_info
+	#print sv_info
 
 	# classify SV. 	
 	if sv_info[1] != sv_info[6]: # breakpoints are located on different chromosomes -> break end
@@ -307,9 +312,13 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 	if sv_info[1] == sv_info[6]: # breakpoints are located on the same chromosome
 		if sv_info[0] != sv_info[5]: # sequences are in opposite directions -> inversed  
 			sv_type = "INV"
+		else: 
+			sv_type = "improving code"	
+
 		#print sv_info[4], sv_info[9]   # compare average read coverage for that chromosome, and for breakpoint-region    	 	
 
 	print 'genotype: ', genotype, 'type: ', sv_type	
+	return sv_info, genotype, sv_type
 
 ################ FUNCTION - BAM-FLAG converter ###############################
 
@@ -377,12 +386,12 @@ def cigar_count (cigar, strandA):
 
 
 ##### TEST DATA ######
-chromA = 11
-chromB = 11
-posA_start = 26503276
-posA_end = 26505276
-posB_start = 30894624
-posB_end = 30896624
+#chromA = 11
+#chromB = 11
+#posA_start = 26503276
+#posA_end = 26505276
+#posB_start = 30894624
+#posB_end = 30896624
 
 # chromA, chromB, posB_start, posA_end, posB_start, posB_end = region_specific_assembly (vcf, bam, ID)
 

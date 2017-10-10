@@ -24,16 +24,16 @@ ABYSS -k 30 -c $5 -o $3_assembly/$4_30_contig.fa $3_fasta/$4.fasta
 ABYSS -k 50 -c $5 -o $3_assembly/$4_50_contig.fa $3_fasta/$4.fasta
 ABYSS -k 70 -c $5 -o $3_assembly/$4_70_contig.fa $3_fasta/$4.fasta
 SSAKE -p 0 -w1 -f $3_fasta/$4.fasta -b $3_assembly/$4_sake
-mkdir $3_assembly/$4_velvet
-velveth $3_assembly/$4_velvet 31 -fasta -short $3_fasta/$4.fasta 
-velvetg $3_assembly/$4_velvet -cov_cutoff 5 
+#mkdir $3_assembly/$4_velvet
+#velveth $3_assembly/$4_velvet 31 -fasta -short $3_fasta/$4.fasta 
+#velvetg $3_assembly/$4_velvet -cov_cutoff 5 
 
 # rename id to be kmer specific in generated files and merge to one file
 sed 's/^>/>30_/' $3_assembly/$4_30_contig.fa > $3_assembly/$4_merged.contig.fa
 sed 's/^>/>50_/' $3_assembly/$4_50_contig.fa >> $3_assembly/$4_merged.contig.fa
 sed 's/^>/>70_/' $3_assembly/$4_70_contig.fa >> $3_assembly/$4_merged.contig.fa
 sed 's/^>/>sake_/' $3_assembly/$4_sake.contigs >> $3_assembly/$4_merged.contig.fa
-sed 's/^>/>velvet_/' $3_assembly/$4_velvet/contigs.fa >> $3_assembly/$4_merged.contig.fa
+#sed 's/^>/>velvet_/' $3_assembly/$4_velvet/contigs.fa >> $3_assembly/$4_merged.contig.fa
 
 # map back new contigs to reference genome
 bwa mem -x intractg $6 $3_assembly/$4_merged.contig.fa > $3_assembly/$4_mapped.sam  

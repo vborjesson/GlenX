@@ -15,21 +15,5 @@ def tab_array (tab_file):
 
 		tab_array = loadtxt(tab_in, dtype=data_dtype,delimiter='\t', skiprows=1)
 
-	print 'Array completed'	
+		print 'Array completed'	
 	return tab_array	
-
-#### SKIP THIS! 
-'''
-# get mean and standard deviation for read coverage over the entire chromosome
-def normal_distr(tab_array, chromosome):
-	chr_data = tab_array['CHR'] == chromosome
-	cov_data = tab_array['coverage'][chr_data]
-	data = np.delete(cov_data, 0)
-	mu_chr_cov, std_chr_cov = norm.fit(data)
-'''
-'''
-	mu_chr_cov = (tab_array['coverage'][data].mean())
-	std_chr_cov = (tab_array['coverage'][data].std())
-	
-	return mu_chr_cov, std_chr_cov
-'''	
