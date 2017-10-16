@@ -87,7 +87,7 @@ def GC_MAP_ARRAY (hg19, bedGraph):
 					region = True						
 					while region == True:
 						if counter >= int(line[1]) and counter <= int(line[2]):
-							position_start = counter
+							position_start = counter 
 							position_end = int(line[2])
 							mappability_score = float(line[3])
 							position_start_digits = '%09d' % position_start

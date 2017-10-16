@@ -10,6 +10,7 @@ from numpy import loadtxt, dtype,float32
 import warnings
 from create_tab_array import tab_array
 from scipy.stats import norm
+import pandas as pd
 
 ################# ARGPARSER ######################
 
@@ -55,12 +56,16 @@ def region_specific_assembly (vcf, bam, ID, tab_array, bwa_ref):
 	
 	with open (vcf, "r") as vcf_in, open (ID + '_GlenX_out/' + ID + '_GlenX.vcf', 'w') as f_out:
 		print 'Reading VCF for region-specific assembly'
-
+		ID_counter = 0
 		for line in vcf_in:
 			if line.startswith("#"):
 				continue 
 			else:
+				print line
 				split_line=line.lower().replace("chr","").split("\t")
+				print split_line
+				if len(split_line) <= 6: # This SV do not have all the correct information and will therefor not be analyzed 
+					continue
 				chromA = split_line[0]
 				posA = split_line[1]
 				posB = 0
@@ -112,8 +117,8 @@ def region_specific_assembly (vcf, bam, ID, tab_array, bwa_ref):
 					region2 = str(chromB) + ':' + str(posB_start) + '-' + str(posB_end)
 				
 				# median chromosome coverage divided in four, will give us a threshold of minimum read coverage that will be returned
-				cov_med = np.median(tab_arr['coverage'])
-				# minimum kmer coverage
+				cov_med = tab_arr['coverage'].median()# (tab_arr['coverage'])
+				# minimum kmer coverage for de novo assembly
 				min_cov = cov_med / 4
 				print 'Minimum coverage accepted: ', min_cov
 				print 'Initiate de novo assembly and mapping contigs back to reference'
@@ -123,26 +128,50 @@ def region_specific_assembly (vcf, bam, ID, tab_array, bwa_ref):
 				sam = assembly_map + '/' + region_ID + '_mapped.sam'
 
 			sv_info, genotype, sv_type = genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, tab_arr)	
-			f_out.write(sv_info, genotype, sv_type)
+			
+			# Skipp this SV if no Breakpoint within the specified region could be find
+			if sv_info == 'N/A':
+				continue
+			# Manipulate line with new improved SV information
+			ID_counter += 1
+			split_line[0] = chromA
+			split_line[1] = sv_info[2] # Breakpoint for SV
+			split_line[2] = 'SV_GlenX_' + str(ID_counter)
+			split_line[4] = sv_type
+			split_line[6] = 'PASS'
+			if sv_type == 'BND':
+			 	split_line[7] = 'SVTYPE=BND' #;CHRA=' + chromA  + ';CHRB=split_line[7] = 'SVTYPE=BND' #;CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] ' + chromB + ';END=' + sv_info[7] # mating breakpoint 
+				split_line[4] = 'N[' + chromB + ':' + sv_info[7] + '['
+			elif sv_type != 'BND':
+				split_line[7] = 'SVTYPE=' + sv_type + ';CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] 
+			split_line[-1] = genotype	
+			
+			vcf_sv = '\t'.join(split_line) # make new tab seperated line of list, (preparations for writing to vcf-file) 
+			string = str(vcf_sv)
+			f_out.write(string)
 
 	return 'KLART'
 	
 
 ########################################### FUNCTION - GENOTYPE CALLER ########################################################################
 
-def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, tab_array):
+def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, tab_df):
 	s_arr = np.empty((0,13), int) # Soft clipping alignment
 	m_arr = np.empty((0,4), int) # matched alignment
 	with open (sam, "r") as sam_in:
 		for line in sam_in:
+
 			breakA = 0 # Breakpoint A (start) will be calculated below
 			breakB = 0 # Breakpoint B (alt mapping) will be calculated below
 			if line[0] == "@": # Skip info lines
 				continue
+			if line[0] == '\n': # if newline in end of file, skip this
+				continue	
+
 			else:
-				line = line.upper().split("\t")
-				alt_chrA = line[2]
-				if len(alt_chrA) >= 3: # if the chromosome number is longer than 2 letters, it will be invalid
+				line = line.upper().rstrip().split("\t")
+				alt_chrA = str(line[2])
+				if '.' in alt_chrA: # if the chromosome number is longer than 2 letters, it will be invalid
 					continue
 				contig_start = int(line[3]) # start position for contig
 				map_scoreA = int(line[4]) 
@@ -159,18 +188,15 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 
 					# look at mate position of split reads. Can be found at optional field starting with SA
 					for field in line:
-						#print field
-						#print line
 						if field.startswith("SA:"):
 							split_info = field.split(":")
 							positions = split_info[-1]
 							n_position = positions.split(";") # split into number of positions. If more than one alternative position, skip! 
-							if len(n_position) > 2:
+							if len(n_position) > 2: # due to one extra object; new line
 								bad_quality = True
 								break
 							position = n_position[0].split(",")
-							print position
-							alt_chrB = int(position[0])
+							alt_chrB = str(position[0])
 							mate_pos_start = position[1] 
 							# strand 
 							if position[2] == "+":
@@ -183,16 +209,17 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 					
 							breakB += int(mate_pos_start)
 							breakB += count_split_posB
-							SA = True
-							
+							SA = True							
 
 						if field.startswith("AS:"):
 							field = field.split(":")
 							contig_l = field[-1]
 
 					if bad_quality:
+						print 'bad quality, continuing with next SV'
 						continue
-					if SA is False: # If the split contig have no second mapping place, continue
+					if SA == False: # If the split contig have no second mapping place, continue
+						print 'No second mapping place have been predicted, continuing with next SV'
 						continue			
 					# count number of cigars, more cigars indicates untrustworthy SV. 
 					cigar_length = 0
@@ -201,18 +228,23 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 
 					# check if breakpoints fall inside desired region
 					region = False
+					chromA = str(chromA)
+					chromB = str(chromB)
+					print alt_chrA, chromA, alt_chrB, chromB
 					if alt_chrA == chromA and alt_chrB == chromB:
+						print 'alt_chrA == chromA and alt_chrB == chromB is TRUE'
 						if breakA >= posA_start and breakA <= posA_end and breakB >= posB_start and breakB <= posB_end:
 							region = True	
 						elif breakA >= posB_start and breakA <= posB_end and breakB >= posA_start and breakB <= posA_end:
 							region = True	
 					
 					elif alt_chrA == chromB and alt_chrB == chromA:
+						print 'alt_chrA == chromB and alt_chrB == chromA: is TRUE'
 						if breakA >= posB_start and breakA <= posB_end and breakB >= posA_start and breakB <= posA_end:
 							region = True
 
 					if region:
-
+						print 'region found'
 						################################################
 						################################################
 						# average read depth for this position 100 bp
@@ -221,36 +253,32 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 						##################################################
 
 						# TIDDIT generates coverage information for every 100 bp. Therefore we will round down to nearest hundred and up to nearest hundred to get
-						# specific region of interest, the calculate the average coverage for that region.  
-						round_down_breakA = breakA/1000
-						round_down_breakA = int (round_down_breakA) * 1000
-						round_up_breakA = round_down_breakA + 1000
-						chrom_breakA = chromA -1
-						cov1_regionA = tab_arr['start'] == round_down_breakA
-						cov1_breakA = (tab_arr['coverage'][cov1_regionA])	
-						cov1_breakA = cov1_breakA[chrom_breakA]
-						cov2_regionA = tab_arr['start'] == round_up_breakA
-						cov2_breakA = (tab_arr['coverage'][cov2_regionA])	
-						cov2_breakA = cov2_breakA[chrom_breakA]
+						# specific region of interest, and calculate the average coverage for that region.  
+						round_down_breakA = breakA/100
+						round_down_breakA = int (round_down_breakA) * 100 # start position for region 100bp
+						round_up_breakA = round_down_breakA + 100 # end position for region 100 bp
+
+						cov1_breakA_list = tab_df.loc[(tab_df['CHR'] == str(alt_chrA)) * tab_df['start'] == str(round_down_breakA)]
+						cov1_breakA = cov1_breakA_list['coverage'].astype(float)
+						cov2_breakA_list = tab_df.loc[(tab_df['CHR'] == str(alt_chrA)) * tab_df['start'] == str(round_up_breakA)]
+						cov2_breakA = cov2_breakA_list['coverage'].astype(float)
 						av_cov_breakA = (cov1_breakA + cov2_breakA) / 2
 
-						round_down_breakB = breakB/1000
-						round_down_breakB = int (round_down_breakB) * 1000
-						round_up_breakB = round_down_breakB + 1000
-						chrom_breakB = chromB -1
-						cov1_regionB = tab_arr['start'] == round_down_breakB
-						cov1_breakB = (tab_arr['coverage'][cov1_regionB])	
-						cov1_breakB = cov1_breakB[chrom_breakB]
-						cov2_regionB = tab_arr['start'] == round_up_breakB
-						cov2_breakB = (tab_arr['coverage'][cov2_regionB])	
-						cov2_breakB = cov2_breakB[chrom_breakB]
-						av_cov_breakB = (cov1_breakB + cov2_breakB) / 2			
+						round_down_breakB = breakB/100
+						round_down_breakB = int (round_down_breakB) * 100 # start position for region 100bp
+						round_up_breakB = round_down_breakB + 100 # end position for region 100 bp
+						
+						cov1_breakB_list = tab_df.loc[(tab_df['CHR'] == str(alt_chrB)) * tab_df['start'] == str(round_down_breakB)]
+						cov1_breakB = cov1_breakB_list['coverage'].astype(float)
+						cov2_breakB_list = tab_df.loc[(tab_df['CHR'] == str(alt_chrB)) * tab_df['start'] == str(round_up_breakB)]
+						cov2_breakB = cov2_breakB_list['coverage'].astype(float)
+						av_cov_breakB = (cov1_breakB + cov2_breakB) / 2
 
 						#print cov1_breakA, cov2_breakA, cov1_breakB, cov2_breakB
 						#print 'cov break A, B', av_cov_breakA, av_cov_breakB	
 						seq = line[8]
 						s_arr = np.append(s_arr, np.array([[strandA, alt_chrA, breakA, map_scoreA, av_cov_breakA, strandB, alt_chrB, breakB, map_scoreB, av_cov_breakB, cigar_length, contig_l, seq]]), axis=0)	
-						print s_arr 
+
 						 
 				elif "M" in cigar:
 					count_match_pos, cigar_length_m = cigar_count (cigar, strandA) # count the number of base pairs that match to reference genome
@@ -260,65 +288,67 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 					match_region_end += match_region_start
 					match_region_end += count_match_pos	
 					m_arr = np.append(m_arr, np.array([[strandA, alt_chrA, match_region_start, match_region_end]]), axis=0)
-	#print s_arr
-	#print m_arr							
+	print s_arr
+	print m_arr							
 
 	# if no breakpoints could be found, skip this variant!					
 	if len(s_arr) == 0:
 		print 'no breakpoints could be found'
-		return 'N/A'
+		return 'N/A', 'N/A', 'N/A'
 
 
+	if len(s_arr) > 0: # if one or more breakpoint was found		
 	# If several predicted SVs in s_arr; compare them and choose the one that seems most trustworthy. 
 	# Use map_score, cigar length, contig length and read coverage over breakpoints.
-	if len(s_arr) > 1:
-		Q_scoring = {}
-		counter = 0
-		for row in s_arr:
-			# Standardize in range 0 - 60 and weight   
-			Q_length = (((int(row[11]) - 0) * (60 - 0)) / (2000 - 0)) + 0
-			Weight = 20
-			Q_qscore = ((((int(row[3])+int(row[8])) - 0) * (60 - 0)) / (120 - 0)) + 0
-			if int(row[10]) >= 5:
-				if row[10] <= 7:
-					Q_cigar = 60
-				elif row[10] >= 8:
-					Q_cigar = 120	
+		if len(s_arr) > 1:
+			Q_scoring = {}
+			counter = 0
+			for row in s_arr:
+				# Standardize in range 0 - 60 and weight   
+				Q_length = (((int(row[11]) - 0) * (60 - 0)) / (2000 - 0)) + 0
+				Weight = 20
+				Q_qscore = ((((int(row[3])+int(row[8])) - 0) * (60 - 0)) / (120 - 0)) + 0
+				if int(row[10]) >= 5:
+					if row[10] <= 7:
+						Q_cigar = 60
+					elif row[10] >= 8:
+						Q_cigar = 120	
+				else: 
+					Q_cigar = 0
+				Qscore = (Q_length * Weight) + Q_qscore - Q_cigar  		
+				Q_scoring[counter] = Qscore		
+				counter += 1
+			best_breakpoint = max(Q_scoring, key=Q_scoring.get)		
+
+		if len(s_arr) == 1:
+			best_breakpoint = 0		
+
+
+		# Check if there is a matching contig to ref that will span over the predicted breakpoint. If there is; The genotype will be 
+		# classified as heterozygous. If we can't find any matching contig spanning the breakpoint, we classify this as homozygous  
+		genotype = ""
+		for row in m_arr:
+			if row[1] == s_arr[best_breakpoint][1] and s_arr[best_breakpoint][2] > row[2] and s_arr[best_breakpoint][2] < row[3]:
+				genotype = "0/1"
+		if genotype == "":
+			genotype = "1/1"
+
+		sv_info = s_arr[best_breakpoint]
+		#print sv_info
+
+		# classify SV. 	
+		if sv_info[1] != sv_info[6]: # breakpoints are located on different chromosomes -> break end
+			sv_type = "BND"
+		if sv_info[1] == sv_info[6]: # breakpoints are located on the same chromosome
+			if sv_info[0] != sv_info[5]: # sequences are in opposite directions -> inversed  
+				sv_type = "INV"
 			else: 
-				Q_cigar = 0
-			Qscore = (Q_length * Weight) + Q_qscore - Q_cigar  		
-			Q_scoring[counter] = Qscore		
-			counter += 1
-		
+				sv_type = "improving code"	
 
-	# Best scoring breakpoint prediction		
-	best_breakpoint = max(Q_scoring, key=Q_scoring.get)
+			#print sv_info[4], sv_info[9]   # compare average read coverage for that chromosome, and for breakpoint-region    	 	
 
-	# Check if there is a matching contig to ref that will span over the predicted breakpoint. If there is; The genotype will be 
-	# classified as heterozygous. If we can't find any matching contig spanning the breakpoint, we classify this as homozygous  
-	genotype = ""
-	for row in m_arr:
-		if row[1] == s_arr[best_breakpoint][1] and s_arr[best_breakpoint][2] > row[2] and s_arr[best_breakpoint][2] < row[3]:
-			genotype = "0/1"
-	if genotype == "":
-		genotype = "1/1"
-
-	sv_info = s_arr[best_breakpoint]
-	#print sv_info
-
-	# classify SV. 	
-	if sv_info[1] != sv_info[6]: # breakpoints are located on different chromosomes -> break end
-		sv_type = "BND"
-	if sv_info[1] == sv_info[6]: # breakpoints are located on the same chromosome
-		if sv_info[0] != sv_info[5]: # sequences are in opposite directions -> inversed  
-			sv_type = "INV"
-		else: 
-			sv_type = "improving code"	
-
-		#print sv_info[4], sv_info[9]   # compare average read coverage for that chromosome, and for breakpoint-region    	 	
-
-	print 'genotype: ', genotype, 'type: ', sv_type	
-	return sv_info, genotype, sv_type
+		print 'genotype: ', genotype, 'type: ', sv_type	
+		return sv_info, genotype, sv_type
 
 ################ FUNCTION - BAM-FLAG converter ###############################
 
@@ -386,20 +416,19 @@ def cigar_count (cigar, strandA):
 
 
 ##### TEST DATA ######
-#chromA = 11
-#chromB = 11
-#posA_start = 26503276
-#posA_end = 26505276
-#posB_start = 30894624
-#posB_end = 30896624
+# chromA = 1
+# chromB = 1
+# posA_start = 26462
+# posA_end = 28462
+# posB_start = 30894
+# posB_end = 32894
 
 # chromA, chromB, posB_start, posA_end, posB_start, posB_end = region_specific_assembly (vcf, bam, ID)
 
 # Make an array from tab file containing read coverage information and average chromosome-specific coverage.  
 tab_arr = tab_array(tab)	
-
 assembly = region_specific_assembly (vcf, bam, ID, tab_arr, bwa_ref)
-
+#sv_info, genotype, sv_type = genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, tab_arr)	
 # Check if SVs are supported in de novo assemby, classify SV type and genotype.  
 # call_genotype = genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, tab_arr)
 
