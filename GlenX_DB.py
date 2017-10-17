@@ -6,7 +6,7 @@ from six import iteritems
 import sqlite3
 import numpy.lib.recfunctions
 
-# CREATE ARRAY WITH GC-BIAS AND MAPPABILITY INFORMATION
+# CREATE ARRAY WITH GC-BIAS AND MAPPABILITY INFORMATION per 100 bp 
 usage = '''This tool takes the human reference genome and a bedGraph-file with mappability scores (see http://rohsdb.cmb.usc.edu/GBshape/cgi-bin/hgFileUi?db=hg19&g=wgEncodeMapability for 100 bp mappability in BigWig format, convert to bedGraph-format) as input and generates a csv file with gc-content and mappability score for every 100 bp''' 
 parser = argparse.ArgumentParser(description=usage)
 parser.add_argument('--hg19', dest='hg19', help = 'Path to reference genome hg 19 directory', required= True)
