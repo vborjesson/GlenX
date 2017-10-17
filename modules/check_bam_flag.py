@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
-
 ################ FUNCTION - BAM-FLAG converter ###############################
 
 # Convert bam-flag to binary numbers and check if 2^4 (reverse strand) is present or not.
@@ -9,6 +8,7 @@
 # (binary_list[4]) is 1 or 0, if it is 1 this means that 2^4 = 16 exist and strand is reverse.
 
 def bam_flag (number):
+	import math
 	binary_list = [] 
 	while number >= 1:
 		number = float(number)

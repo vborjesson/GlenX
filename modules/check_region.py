@@ -1,8 +1,12 @@
 #!/usr/bin/python
 
 import argparse
-#from GlenX import bam_flag
+import sys 
 import math
+sys.path.insert(0, '/proj/b2014152/private/vanja/GlenX/modules')
+from check_bam_flag import bam_flag
+from cigar import cigar_count
+
 
 usage = '''This function creates a new sam file containing only these SVs that are inside the region of interest''' 
 parser = argparse.ArgumentParser(description=usage)
@@ -14,13 +18,14 @@ parser.add_argument('--region2', dest='region2', help = 'format chrom:start_pos-
 args = parser.parse_args()
 
 sam = args.sam
-out = args.sam
+out = args.out
 region1 = args.region1
 region2 = args.region2
 
 def check_region (sam, out, region1, region2):
 	print 'function is initiated'
-	with open (sam, 'r') as sam_in, open (out + '.sam', 'w') as f_out:
+	print out
+	with open (sam, 'r') as sam_in, open (out, 'w') as f_out:
 		for line in sam_in:
 			print line
 
@@ -93,65 +98,44 @@ def check_region (sam, out, region1, region2):
 					region = False
 
 					# The specified regions we want our reads to fall within
-					spec_regionA = region1.split(':').split('-')
-					spec_regionB = region2.split(':').split('-')
-					breakA = spec_regionA[0]
-					posA_start = spec_regionA[1]
-					posA_end = spec_regionA[2]
-					breakB = spec_regionB[0]
-					posB_start = spec_regionB[1]
-					posB_end = spec_regionB[2]					
+
+					spec_regionA = region1.split(':')
+					spec_regionB = region2.split(':')
+					chromA = spec_regionA[0]
+					posA = spec_regionA[1]
+					posA = posA.split('-')
+					posA_start = int(posA[0])
+					posA_end = int(posA[1])
+					chromB = spec_regionB[0]
+					posB = spec_regionB[1]
+					posB = posB.split('-')
+					posB_start = int(posB[0])
+					posB_end = int(posB[1])					
 
 					if alt_chrA == chromA and alt_chrB == chromB:
-						print 'alt_chrA == chromA and alt_chrB == chromB is TRUE'
 						if breakA >= posA_start and breakA <= posA_end and breakB >= posB_start and breakB <= posB_end:
 							region = True	
 						elif breakA >= posB_start and breakA <= posB_end and breakB >= posA_start and breakB <= posA_end:
 							region = True	
 					
 					elif alt_chrA == chromB and alt_chrB == chromA:
-						print 'alt_chrA == chromB and alt_chrB == chromA: is TRUE'
 						if breakA >= posB_start and breakA <= posB_end and breakB >= posA_start and breakB <= posA_end:
 							region = True
 
-					string = ''.join(line)		
+					string = '\t'.join(line)		
+					print string
 					if region:
-						f_out.write(string)
+						print 'region is true'
+						print string 
+						f_out.write('{} + {}' .format(string, '\n'))
+
+		
 
 print 'initiating check region..'
 check_region (sam, out, region1, region2)
 
 
-################ FUNCTION - BAM-FLAG converter ###############################
 
-# Convert bam-flag to binary numbers and check if 2^4 (reverse strand) is present or not.
-# Binary numbers with factor 2, backwards: 2^0, 2^1, 2^2, 2^3, 2^4 .. 2^n. In the list created below; if the 
-# the first position (binary_list[0]) is 1, this means that 2^0 = 1 is present. So we will check if position 5
-# (binary_list[4]) is 1 or 0, if it is 1 this means that 2^4 = 16 exist and strand is reverse.
-
-def bam_flag (number):
-	binary_list = [] 
-	while number >= 1:
-		number = float(number)
-		number = number / 2
-		#print number
-
-		# If number is a whole number, this will be a binary 0. And if is a decimal number, it will be a 1. 
-		if number.is_integer():
-			binary_list.append(int(0))
-		else:
-			binary_list.append(int(1))
-			# round number down to nearest integer
-			number = math.floor(number)
-	
-	# Check if the fifth number (2^4) backwards in binary_list is a 1 
-	if len(binary_list) >= 5:
-		if binary_list[4] == 1:
-			return 1
-		else:
-			return 0		
-	else:
-		return 0
 
 
 

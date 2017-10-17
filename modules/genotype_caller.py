@@ -1,10 +1,15 @@
 ##!/usr/bin/python
 
 import numpy as np
+import sys
+sys.path.insert(0, '/proj/b2014152/private/vanja/GlenX/modules')
+from check_bam_flag import bam_flag
+from cigar import cigar_count
+
 
 ########################################### FUNCTION - GENOTYPE CALLER ########################################################################
 
-def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, tab_df):
+def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, tab_df):
 	s_arr = np.empty((0,13), int) # Soft clipping alignment
 	m_arr = np.empty((0,4), int) # matched alignment
 	with open (sam, "r") as sam_in:
@@ -143,7 +148,6 @@ def genotype_caller (sam, chromA, chromB, posA_start, posA_end, posB_start, posB
 	if len(s_arr) == 0:
 		print 'no breakpoints could be found'
 		return 'N/A', 'N/A', 'N/A'
-		break
 
 	if len(s_arr) > 0: # if one or more breakpoint was found		
 	# If several predicted SVs in s_arr; compare them and choose the one that seems most trustworthy. 

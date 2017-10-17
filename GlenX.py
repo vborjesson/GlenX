@@ -8,9 +8,11 @@ import math
 import numpy as np
 from numpy import loadtxt, dtype,float32
 import warnings
+sys.path.insert(0, '/proj/b2014152/private/vanja/GlenX/modules')
 from create_tab_array import tab_array
 from genotype_caller import call_genotype
 from cigar import cigar_count
+from check_bam_flag import bam_flag
 from scipy.stats import norm
 import pandas as pd
 
@@ -30,7 +32,7 @@ parser.add_argument('--bwa_ref', dest='bwa_ref', help = 'Path to reference genom
 #parser.add_argument('--fa', dest= 'fa', help= 'Path to fasta-file with contigs generated from abyss', required = False)
 
 args = parser.parse_args()
-sys.path.insert('./modules/')
+#sys.path.insert('./modules/')
 
 vcf = args.vcf_in
 bam = args.bam_in
@@ -56,8 +58,10 @@ def region_specific_assembly (vcf, bam, ID, tab_array, bwa_ref):
 	subprocess.call ('mkdir ' + ID + '_assembly', shell = True)
 	subprocess.call ('mkdir ' + ID + '_GlenX_out', shell = True)
 	subprocess.call('chmod +x assembly.sh', shell=True)
+
+	file_name = '{}{}{}{}'.format(ID, '_GlenX_out/', ID, '_GlenX.vcf')
 	
-	with open (vcf, "r") as vcf_in, open (ID + '_GlenX_out/' + ID + '_GlenX.vcf', 'w') as f_out:
+	with open (vcf, "r") as vcf_in, open (file_name, 'w') as f_out:
 		print 'Reading VCF for region-specific assembly'
 		ID_counter = 0
 		for line in vcf_in:
@@ -88,8 +92,8 @@ def region_specific_assembly (vcf, bam, ID, tab_array, bwa_ref):
 
 				# unique ID for every region-specific bam-file	
 				counter += 1	# Unique ID 
-				region_ID = ID + "_region_" + str(counter)
-				assembly_map = ID + '_assembly'
+				region_ID = '{}{}{}'.format(ID, "_region_", str(counter))
+				assembly_map = '{}{}'.format(ID, '_assembly')
 				
 
 				posA = int(posA)
@@ -104,20 +108,20 @@ def region_specific_assembly (vcf, bam, ID, tab_array, bwa_ref):
 				if chromA == chromB:
 					if posA < posB:
 						if posA_end >= posB_start: # overlapping region
-							region = str(chromA) + ':' + str(posA_start) + '-' + str(posB_end)
+							region = '{}:{}-{}'.formart(str(chromA), str(posA_start), str(posB_end))
 						else: 
-							region = str(chromA) + ':' + str(posA_start) + '-' + str(posA_end) 
-							region2 = str(chromB) + ':' + str(posB_start) + '-' + str(posB_end)
+							region = '{}:{}-{}'.format(str(chromA), str(posA_start), str(posA_end)) 
+							region2 = '{}:{}-{}'.format(str(chromB), str(posB_start), str(posB_end))
 
 					if posA > posB:
 						if posB_end >= posA_start:
-							region = str(chromA) + ':' + str(posB_start) + '-' + str(posA_end)
+							region = '{}:{}-{}'.format(str(chromA), str(posB_start), str(posA_end))
 						else:
-							region = str(chromA) + ':' + str(posA_start) + '-' + str(posA_end) 
-							region2 = str(chromB) + ':' + str(posB_start) + '-' + str(posB_end)				
+							region = '{}:{}-{}'.format(str(chromA), str(posA_start), str(posA_end)) 
+							region2 = '{}:{}-{}'.format(str(chromB), str(posB_start), str(posB_end))				
 				else:
-					region = str(chromA) + ':' + str(posA_start) + '-' + str(posA_end)
-					region2 = str(chromB) + ':' + str(posB_start) + '-' + str(posB_end)
+					region = '{}:{}-{}'.format(str(chromA), str(posA_start), str(posA_end))
+					region2 = '{}:{}-{}'.format(str(chromB), str(posB_start), str(posB_end))
 				
 				# median chromosome coverage divided in four, will give us a threshold of minimum read coverage that will be returned
 				cov_med = tab_arr['coverage'].median()# (tab_arr['coverage'])
@@ -127,8 +131,7 @@ def region_specific_assembly (vcf, bam, ID, tab_array, bwa_ref):
 				print 'Initiate de novo assembly and mapping contigs back to reference'
 				process = ['./assembly.sh', bam, region, ID, region_ID, str(min_cov), bwa_ref, region2]
 				os.system(" ".join(process))
-				#subprocess.call('./assembly.sh ' + bam + ' ' + region + ' ' + ID  + ' ' + region_ID + ' ' + min_cov + ' ' + bwa_mem + ' ' + region2, shell = True)
-				sam = assembly_map + '/' + region_ID + '_mapped.sam'
+				sam = '{}/{}_mapped.sam' .format(assembly_map, region_ID)
 
 			sv_info, genotype, sv_type = call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, tab_arr)	
 			
@@ -139,14 +142,14 @@ def region_specific_assembly (vcf, bam, ID, tab_array, bwa_ref):
 			ID_counter += 1
 			split_line[0] = chromA
 			split_line[1] = sv_info[2] # Breakpoint for SV
-			split_line[2] = 'SV_GlenX_' + str(ID_counter)
+			split_line[2] = 'SV_GlenX_{}'.format(str(ID_counter))
 			split_line[4] = sv_type
 			split_line[6] = 'PASS'
 			if sv_type == 'BND':
 			 	split_line[7] = 'SVTYPE=BND' #;CHRA=' + chromA  + ';CHRB=split_line[7] = 'SVTYPE=BND' #;CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] ' + chromB + ';END=' + sv_info[7] # mating breakpoint 
-				split_line[4] = 'N[' + chromB + ':' + sv_info[7] + '['
+				split_line[4] = 'N[{}:{}[' .format(chromB, sv_info[7])
 			elif sv_type != 'BND':
-				split_line[7] = 'SVTYPE=' + sv_type + ';CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] 
+				split_line[7] = 'SVTYPE={};CHRA={};CHRB={};END={}'.format(sv_type, chromA, chromB, sv_info[7]) #'SVTYPE=' + sv_type + ';CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] 
 			split_line[-1] = genotype	
 			
 			vcf_sv = '\t'.join(split_line) # make new tab seperated line of list, (preparations for writing to vcf-file) 

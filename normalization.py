@@ -33,4 +33,4 @@ def normalize_data(norm, tab):
 	tab_df["key_name"] = tab_df["chrom"].map(str) + str(':') + tab_df["start"]
 	
 	#print (tab_df)
-create = normalize_data(args.norm_db, tab)
+create = normalize_data(args.norm_db, args.tab)

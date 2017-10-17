@@ -8,6 +8,15 @@ Takes an vcf, bam and tab-file with read depth per 100 bp as input.
 dependencies: 
 	GlenX uses three different assembly tools for de novo assemly and mapping; abyss, velveth, SSAKE, BWA and samtools. All these softwares needs to be installed. 
 	You will also need a SQlite-database with reference genome GC-content and mappability score / 100bp. Look at; Create database. 
+```
+ABySS
+SSAKE
+BWA
+samtools
+clustalw
+GlenX_DB
+consensus (https://github.com/J35P312/SplitVision) 
+```
 
 ## Create database
 requirements; pandas, numpy
@@ -16,7 +25,7 @@ An database needs to be created in order for normalization of data before analys
 ```
 python gc_map_array.py --hg19 /path/to/refgenome --bed /path/to/bedGraph
 ```
-This will create a normalization.db database in the GlenX directory
+This will create a GlenX.db database in the GlenX directory
 
 ## Run GlenX
 ```
