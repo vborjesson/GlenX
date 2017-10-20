@@ -129,6 +129,7 @@ def region_specific_assembly (vcf, bam, ID, tab_array, bwa_ref):
 				min_cov = cov_med / 4
 				print 'Minimum coverage accepted: ', min_cov
 				print 'Initiate de novo assembly and mapping contigs back to reference'
+				print 'region1-2', region, region2
 				process = ['./assembly.sh', bam, region, ID, region_ID, str(min_cov), bwa_ref, region2]
 				os.system(" ".join(process))
 				sam = '{}/{}_mapped.sam' .format(assembly_map, region_ID)

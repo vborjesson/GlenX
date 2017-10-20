@@ -30,7 +30,7 @@ ABYSS -k 30 -c 3 -o $3_assembly/$4_30_contig.fa $3_fasta/$4.fasta
 ABYSS -k 50 -c 3 -o $3_assembly/$4_50_contig.fa $3_fasta/$4.fasta
 ABYSS -k 70 -c 3 -o $3_assembly/$4_70_contig.fa $3_fasta/$4.fasta
 ABYSS -k 90 -c 3 -o $3_assembly/$4_90_contig.fa $3_fasta/$4.fasta
-SSAKE -p 0 -w1 -f $3_fasta/$4.fasta -b $3_assembly/$4_sake
+SSAKE -p 0 -w10 -f $3_fasta/$4.fasta -b $3_assembly/$4_sake
 #mkdir $3_assembly/$4_velvet
 #velveth $3_assembly/$4_velvet 31 -fasta -short $3_fasta/$4.fasta 
 #velvetg $3_assembly/$4_velvet -cov_cutoff 5 
