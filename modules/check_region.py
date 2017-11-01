@@ -24,10 +24,8 @@ region2 = args.region2
 
 def check_region (sam, out, region1, region2):
 	print 'function is initiated'
-	print out
 	with open (sam, 'r') as sam_in, open (out, 'w') as f_out:
 		for line in sam_in:
-			print line
 
 			breakA = 0 # Breakpoint A (start) will be calculated below
 			breakB = 0 # Breakpoint B (alt mapping) will be calculated below
@@ -84,10 +82,10 @@ def check_region (sam, out, region1, region2):
 							contig_l = field[-1]
 
 					if bad_quality:
-						print 'bad quality, continuing with next SV'
+						#print 'bad quality, continuing with next SV'
 						continue
 					if SA == False: # If the split contig have no second mapping place, continue
-						print 'No second mapping place have been predicted, continuing with next SV'
+						#print 'No second mapping place have been predicted, continuing with next SV'
 						continue			
 					# count number of cigars, more cigars indicates untrustworthy SV. 
 					cigar_length = 0
@@ -122,11 +120,9 @@ def check_region (sam, out, region1, region2):
 						if breakA >= posB_start and breakA <= posB_end and breakB >= posA_start and breakB <= posA_end:
 							region = True
 
-					string = '\t'.join(line)		
-					print string
+					string = '\t'.join(line)			
 					if region:
 						print 'region is true'
-						print string 
 						f_out.write('{} + {}' .format(string, '\n'))
 
 		

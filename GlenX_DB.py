@@ -1,11 +1,22 @@
 #!/usr/bin/python
+
 import argparse
 from six import iteritems
 import sqlite3
 import numpy as np
 #import numpy.lib.recfunctions
 
-# This is a script that creates a database containing information about GC-content and mappability score for the whole genome per 100 bp.  
+#======================================================================================================================================
+# GLENX.db
+# Version 0.0.0 
+#
+# CREATE GLENX DATABASE 
+# This is a script that creates a database containing information about GC-content and mappability score for the whole genome per 100 bp.
+# It takes a bigGraph file generated from UCSCs BigWig-file, and calculates the mappability.score for every 100th bp in the genome. Then it takes 
+# the human genome reference genome and calculats the GC-content(%) for every 100 bp. It is all saved in a SQLite database named GlenX.db
+# 
+# For more information: Visit https://github.com/vborjesson/GlenX.git
+#======================================================================================================================================    
 
 usage = '''This tool takes the human reference genome and a bedGraph-file with mappability scores (see http://rohsdb.cmb.usc.edu/GBshape/cgi-bin/hgFileUi?db=hg19&g=wgEncodeMapability for 100 bp mappability in BigWig format, convert to bedGraph-format) as input and generates a csv file with gc-content and mappability score for every 100 bp''' 
 parser = argparse.ArgumentParser(description=usage)
@@ -22,6 +33,7 @@ def create_db (hg19, bedGraph):
 		print 'Reads reference genome...'
 		seq_dict = {}
 		seq = []
+		not_valid = False
 
 		for line in f_in:
 			if line[0] == ">":
@@ -34,10 +46,15 @@ def create_db (hg19, bedGraph):
 				ID_line = line[1:].split(' ')
 				ID = ID_line[0].rstrip() # chromosome
 				if ID not in valid_chrom: # invalid chromosome	 -> continue to next!
+					not_valid = True
 					continue
-				print 'Processing: ', ID, '...'						
+				if ID in valid_chrom:
+					not_valid = False
+					print 'Processing: ', ID, '...'	
+					continue					
 
-				#print ID
+			if not_valid == True:
+				continue	
 			else:
 				line = line.upper().strip() 	
 				seq.append (line)
@@ -57,7 +74,7 @@ def create_db (hg19, bedGraph):
 		print 'GC-content for ', chrom, ' is prossesing...'
 		seq_length = len(seq) / 100
 
-		# nake a list of all nucleotides in the genome for every chromosome specific
+		# make a list of all nucleotides in the genome for every chromosome specific
 		seq_list = []
 		for nuc in seq: 
 			seq_list.append(nuc)
@@ -65,6 +82,7 @@ def create_db (hg19, bedGraph):
 		# count the GC content for every 100 bp and add to SQlite database
 		for x in range (0, 2500000):
 			start_pos = x * 100
+
 			end_pos = start_pos + 100
 			if x > seq_length: # If there are no more information, just add 0 to database
 				cursorObject.execute('''INSERT INTO GlenX (chrom, start_pos, end_pos, GC_content) VALUES (?,?,?,?)''', (chrom, start_pos, end_pos, 0))
@@ -114,34 +132,10 @@ def create_db (hg19, bedGraph):
 			mappability = av_map_score[i]
 			cursorObject.execute('''UPDATE GlenX set mappability_score = ? WHERE chrom = ? AND start_pos = ? AND end_pos = ?''', (mappability, chrom, start_pos, end_pos))
 
+		cursorObject.execute('''CREATE INDEX COV ON GlenX (chrom, start_pos, end_pos)''')	
+		cursorObject.execute('''CREATE INDEX GC ON GlenX (GC_content)''')
 		db.commit()
+		db.close()
 		print 'GlenX database completed'
-
-
-
-
-					
-
-
-
-	'''			
-	#print map_arr
-	#print gc_arr 				
-	data = gc_arr
-	df1 = pd.DataFrame(data=data[1:,1:],
-				index=data[1:,0], 
-				#columns=data[0,1:])
-				columns=['chrom', 'pos_start', 'pos_end', 'GC_content'])
-	data2 = map_arr
-	df2 = pd.DataFrame(data=data2[1:,1:],
-				index=data2[1:,0], 
-				columns=['mappability'])
-	df = pd.concat([df1, df2], axis=1)
-	conn = sqlite3.connect('normalization.db')
-
-	df.to_sql("normalization_data", conn, if_exists="replace")
-	#a = pd.read_sql_query("select * from normalization_data;", conn)
-	#print a
-'''
 
 array = create_db(args.hg19, args.bedGraph)
