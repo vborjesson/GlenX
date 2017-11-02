@@ -28,7 +28,6 @@ parser = argparse.ArgumentParser(description=usage)
 parser.add_argument('--vcf', dest='vcf_in', help = 'Path to vcf-file', required= True)
 parser.add_argument('--bam', dest='bam_in', help = 'Path to bam-file', required= True) 
 parser.add_argument('--tab', dest='tab_in', help = 'Path to tab_file', required= True)
-parser.add_argument('--norm_db', dest='norm_db', help = 'Path normalization.db', required= False)
 parser.add_argument('--ID', dest='ID', help= 'sample ID', required = False)
 parser.add_argument('--sam', dest='sam', help= 'path to sam-file for dry run', required=False)
 parser.add_argument('--bwa_ref', dest='bwa_ref', help = 'Path to reference genome for bwa mem', required=True)
@@ -160,7 +159,7 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 			contig_l = sv_info[9]
 			contig_seq = sv_info[10]
 
-			glenX_stats = '{}|{}|{}|{}|{}|{}'.format() # contig length, seq, read ceverage, gc-content and mappabilty score
+			glenX_stats = '{}|{}|{}|{}|{}|{}'.format() # contig length, seq, normalized read ceverage, raw read-coverage, gc-content and mappabilty score
 			
 			if sv_type == 'BND':
 			 	split_line[7] = 'SVTYPE=BND;GlenX={}'.format(GlenX_stats) #;CHRA=' + chromA  + ';CHRB=split_line[7] = 'SVTYPE=BND' #;CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] ' + chromB + ';END=' + sv_info[7] # mating breakpoint 
@@ -173,21 +172,12 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 			string = str(vcf_sv)
 			f_out.write(string + "\n")
 
-	return 'All variants in the vcf-file have been assembled, mapped and analysed.'		
+	return 'All variants in the vcf-file have been assembled, mapped and analyzed.'		
 
 
-
-##### TEST DATA ######
-# chromA = 1
-# chromB = 1
-# posA_start = 26462
-# posA_end = 28462
-# posB_start = 30894
-# posB_end = 32894
-
-# chromA, chromB, posB_start, posA_end, posB_start, posB_end = region_specific_assembly (vcf, bam, ID)
-
-# Make an array from tab file containing read coverage information and average chromosome-specific coverage.  
+#======================================================================================================
+# START GLENX
+#======================================================================================================
 
 db = read_cov_db(ID, tab)
 print 'The database: ', db, 'is completed'	

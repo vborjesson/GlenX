@@ -12,12 +12,18 @@ from cdhit import ex_cdhit
 from statistics import get_stats
 
 
-########################################### FUNCTION - GENOTYPE CALLER ########################################################################
+#===================================================================================================
+# GENOTYPE CALLER
+#===================================================================================================
 
 def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, db):
 	s_arr = np.empty((0,11), int) # Soft clipping alignment
 	m_arr = np.empty((0,4), int) # matched alignment
 	with open (sam, "r") as sam_in:
+
+		#===========================================================================================
+		#  Read in sam file and check for soft clips inside the specific region. 
+		#===========================================================================================
 		for line in sam_in:
 
 			breakA = 0 # Breakpoint A (start) will be calculated below
@@ -56,6 +62,7 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 							position = n_position[0].split(",")
 							alt_chrB = str(position[0])
 							mate_pos_start = position[1] 
+							
 							# strand 
 							if position[2] == "+":
 								strandB = 0
@@ -74,10 +81,8 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 							contig_l = field[-1]
 
 					if bad_quality:
-						#print 'bad quality, continuing with next SV'
 						continue
 					if SA == False: # If the split contig have no second mapping place, continue
-						#print 'No second mapping have been predicted, continuing with next SV'
 						continue			
 					# count number of cigars, more cigars indicates untrustworthy SV. 
 					cigar_length = 0
@@ -89,27 +94,21 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 					chromA = str(chromA)
 					chromB = str(chromB)
 					if alt_chrA == chromA and alt_chrB == chromB:
-						#print 'alt_chrA == chromA and alt_chrB == chromB is TRUE'
 						if breakA >= posA_start and breakA <= posA_end and breakB >= posB_start and breakB <= posB_end:
 							region = True	
 						elif breakA >= posB_start and breakA <= posB_end and breakB >= posA_start and breakB <= posA_end:
 							region = True	
-					
 					elif alt_chrA == chromB and alt_chrB == chromA:
-						#print 'alt_chrA == chromB and alt_chrB == chromA: is TRUE'
 						if breakA >= posB_start and breakA <= posB_end and breakB >= posA_start and breakB <= posA_end:
 							region = True
 
-					if region:
-						print 'region found'
-
+					if region: # If region is True, save to array
 						seq = line[8]
 						s_arr = np.append(s_arr, np.array([[strandA, alt_chrA, breakA, map_scoreA, strandB, alt_chrB, breakB, map_scoreB, cigar_length, int(contig_l), seq]]), axis=0)	
 
-						 
+				# Matched contig 		 
 				elif "M" in cigar:
 					count_match_pos, cigar_length_m = cigar_count (cigar, strandA) # count the number of base pairs that match to reference genome
-					# print count_match_pos, cigar_length_m
 					match_region_end = 0
 					match_region_start = int(contig_start)
 					match_region_end += match_region_start
@@ -145,6 +144,10 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 
 		# Get statistics from GlenX.db and read_cov.db
 		statistics = get_stats(db, chromA, breakA)
+		stat_map_score = statistics['map_i']
+
+		# mappability threshold, we do not want to keep SVs who have a low mappability score = no support for SV.  
+		#if stat_map_score is < 
 
 		# classify SV. 	
 		if best_breakpoint[1] != best_breakpoint[6]: # breakpoints are located on different chromosomes -> break end

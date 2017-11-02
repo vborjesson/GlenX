@@ -4,10 +4,15 @@ import sqlite3
 import sys
 
 db = sys.argv[1]
-ch = 1
-pos = 17900
+ch = "1"
+pos = 17900000
 
 def get_stats(db, ch, pos):
+
+	ch = '{}{}'.format('chr', ch)
+	print 'Normalizing the read coverage and generating statistics for this breakpoint'
+
+	print db, 'chromosome', ch, 'position', pos
 
 	statistics = {}
 	# Connect the two databases
@@ -17,10 +22,11 @@ def get_stats(db, ch, pos):
 	cursor = db1.cursor()
 
 	# get out the specific statistic.  
-	gc_content = cursor.execute('''SELECT GC_content FROM db2.glen as a where a.chrom=? and a.start_pos = ? ''', (ch, pos)).fetchone()[0]
-	r_i = cursor.execute('''SELECT read_coverage FROM read_cov where chrom=? and start_pos = ? ''', (ch, pos)).fetchone()[0]
-	m_gc =cursor.execute('''SELECT avg(a.read_coverage) FROM (SELECT a.chrom, a.start_pos, a.end_pos, a.read_coverage, b.GC_content FROM read_cov as a join db2.glen as b WHERE a.chrom = b.chrom and a.start_pos=b.start_pos) a where a.GC_content=? and a.read_coverage > ?''', (gc_content,0)).fetchone()[0]
-	m_all = cursor.execute('''SELECT avg(a.read_coverage) FROM (SELECT a.chrom, a.start_pos, a.end_pos, a.read_coverage, b.GC_content FROM read_cov as a join db2.glen as b WHERE a.chrom = b.chrom and a.start_pos=b.start_pos) a where a.read_coverage > ?''', (0,)).fetchone()[0]
+	map_i = cursor.execute('''SELECT mappability_score FROM db2.GlenX as a where a.chrom=? and a.start_pos = ? ''', (ch, pos)).fetchone()[0]
+	gc_content = cursor.execute('''SELECT GC_content FROM db2.GlenX as a where a.chrom=? and a.start_pos = ? ''', (ch, pos)).fetchone()[0]
+	r_i = cursor.execute('''SELECT read_coverage FROM read_cov where chrom=? and start_pos= ? ''', (ch, pos)).fetchone()[0]
+	m_gc =cursor.execute('''SELECT avg(read_coverage) FROM (SELECT a.chrom, a.start_pos, a.end_pos, a.read_coverage, b.GC_content, b.mappability_score FROM read_cov as a join db2.GlenX as b WHERE a.chrom = b.chrom and a.start_pos=b.start_pos) as c where GC_content=? and read_coverage > ? and chrom=?''', (gc_content,0,ch)).fetchone()[0]
+	m_all = cursor.execute('''SELECT avg(read_coverage) FROM (SELECT a.chrom, a.start_pos, a.end_pos, a.read_coverage, b.GC_content, b.mappability_score FROM read_cov as a join db2.GlenX as b WHERE a.chrom = b.chrom and a.start_pos=b.start_pos) as c where read_coverage > ? and chrom=?''', (0,ch)).fetchone()[0]
 
 	# normalize the read coverage for the breakpoint
 	r_i_norm = r_i * m_all / m_gc
@@ -30,11 +36,15 @@ def get_stats(db, ch, pos):
 	statistics['m_gc'] = m_gc # average read count of all windows having the same gc percentage as i:th window
 	statistics['gc_content'] = gc_content # gc content (refernece genome) for the i:th window
 	statistics['r_i_norm'] = r_i_norm # normalized read counts for the i:th window
-
+	statistics['map_i'] = map_i # mappability scorefor the ith window
+ 
 	db1.commit()
 
 	return statistics
 
-print statistics	
+statistics = get_stats(db, ch, pos)
+#print statistics	
+#print statistics['r_i']
+
 
 

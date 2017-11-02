@@ -17,17 +17,16 @@ samtools
 clustalw
 GlenX_DB
 consensus (https://github.com/J35P312/SplitVision) 
-cdhit - (https://github.com/weizhongli/cdhit/wiki/3.-User's-Guide#CDHITEST)
 ```
 
 ## Create database
-requirements; pandas, numpy
-An database needs to be created in order for normalization of data before analyses can be done. Download mappability scores for reference genome hg19 from rohsdb.cmb.usc.edu/GBshape/cgi-bin/hgFileUi?db=hg19&g=wgEncodeMapability and convert the bigwig file to readable bedGraph. Do also download the hg19 reference genome. 
+requirements; SQLite3
+Statistics are needed to confirm and support the new predicted genotype and SV-type, therefor GlenX requires GlenX.db with GC-content and mappability information. Download mappability scores for reference genome hg19 from rohsdb.cmb.usc.edu/GBshape/cgi-bin/hgFileUi?db=hg19&g=wgEncodeMapability and convert the bigwig file to readable bedGraph. Do also download the hg19 reference genome. 
 
 ```
-python gc_map_array.py --hg19 /path/to/refgenome --bed /path/to/bedGraph
+python GlenX_DB.py --hg19 /path/to/refgenome --bed /path/to/bedGraph
 ```
-This will create a GlenX.db database in the GlenX directory
+This will create GlenX.db SQL database in the GlenX directory
 
 ## Run GlenX
 ```
