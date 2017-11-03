@@ -32,7 +32,6 @@ def read_cov_db (ID, tab_file):
 # Calculating and Returning median read coverage for the whole genome
 #=====================================================================
 def median_cov (db_path):
-	print 'database path: ', db_path
 	db = sqlite3.connect(db_path)
 	cursor_o = db.cursor()
 	med_cov = cursor_o.execute('''SELECT avg(read_coverage) FROM read_cov where read_coverage > ?''', (0,)).fetchone()[0]
