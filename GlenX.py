@@ -74,7 +74,7 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 					info_field = True 
 				else: 
 					if info_field == True:
-						info_GlenX = "##INFO=<ID=GlenX,Number=6,Type=Float,Description='contig length, contig sequence, normalized breakpoint read-coverage (100bp), raw breakpoint read-coverage (100bp), gc-content(ref) and mappability-score(ref)'"
+						info_GlenX = "##INFO=<ID=GlenX,Number=7,Type=Float,Description='contig length, contig sequence, normalized breakpoint read-coverage (100bp), averaage read coverage for all regions above mappability threshold 0.9, raw breakpoint read-coverage (100bp), gc-content(ref) and mappability-score(ref)'"
 						info_field = False
 				continue 
 			else:
@@ -159,7 +159,7 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 			contig_l = sv_info[9]
 			contig_seq = sv_info[10]
 
-			glenX_stats = '{}|{}|{}|{}|{}|{}'.format() # contig length, seq, normalized read ceverage, raw read-coverage, gc-content and mappabilty score
+			glenX_stats = '{}|{}|{}|{}|{}|{}|{}'.format(contig_l, contig_seq, statistics['r_i_norm'], statistics['r_i'], statistics['m_all_at'], statistics['gc_content'], statistics['map_i'] ) # contig length, seq, normalized read ceverage, raw read-coverage, gc-content and mappabilty score
 			
 			if sv_type == 'BND':
 			 	split_line[7] = 'SVTYPE=BND;GlenX={}'.format(GlenX_stats) #;CHRA=' + chromA  + ';CHRB=split_line[7] = 'SVTYPE=BND' #;CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] ' + chromB + ';END=' + sv_info[7] # mating breakpoint 

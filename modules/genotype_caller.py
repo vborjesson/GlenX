@@ -147,7 +147,8 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 		stat_map_score = statistics['map_i']
 
 		# mappability threshold, we do not want to keep SVs who have a low mappability score = no support for SV.  
-		#if stat_map_score is < 
+		if stat_map_score  < 0.9:
+			return s_arr, 'N/A', 'N/A' 
 
 		# classify SV. 	
 		if best_breakpoint[1] != best_breakpoint[6]: # breakpoints are located on different chromosomes -> break end
@@ -156,6 +157,8 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 			if best_breakpoint[0] != best_breakpoint[5]: # sequences are in opposite directions -> inversed  
 				sv_type = "INV"
 			else: 
+				# DEL
+				# DUP
 				sv_type = "improving code"	
 	
 		return best_breakpoint, genotype, sv_type, statistics
