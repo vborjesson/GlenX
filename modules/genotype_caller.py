@@ -8,7 +8,6 @@ module_path = '{}{}'.format(cwd, '/modules')
 sys.path.insert(0, module_path)
 from check_bam_flag import bam_flag
 from cigar import cigar_count
-from cdhit import ex_cdhit
 from statistics import get_stats
 
 
@@ -118,7 +117,7 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 	# if no breakpoints could be found, skip this variant!					
 	if len(s_arr) == 0:
 		#print 'no breakpoints could be found'
-		return s_arr, 'N/A', 'N/A' # returns N/A in order to continue the loop
+		return s_arr, 'N/A', 'N/A', 'N/A' # returns N/A in order to continue the loop
 
 	elif len(s_arr) > 0: # if one or more breakpoint was found		
 	# If several predicted SVs in s_arr; compare them and choose the one that seems most trustworthy. 
@@ -148,7 +147,7 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 
 		# mappability threshold, we do not want to keep SVs who have a low mappability score = no support for SV.  
 		if stat_map_score  < 0.9:
-			return s_arr, 'N/A', 'N/A' 
+			return s_arr, 'N/A', 'N/A', statistics 
 
 		# classify SV. 	
 		if best_breakpoint[1] != best_breakpoint[6]: # breakpoints are located on different chromosomes -> break end

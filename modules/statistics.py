@@ -1,11 +1,11 @@
 #/usr/bin/python
 
 import sqlite3
-import sys
 
-db = sys.argv[1]
-ch = "1"
-pos = 17900000
+
+#db = sys.argv[1]
+#ch = "1"
+#pos = 17900000
 
 def get_stats(db, ch, pos):
 
@@ -42,8 +42,8 @@ def get_stats(db, ch, pos):
 
 	return statistics
 
-statistics = get_stats(db, ch, pos)
-print statistics	
+#statistics = get_stats(db, ch, pos)
+#print statistics	
 #print statistics['r_i']
 
 

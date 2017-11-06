@@ -145,7 +145,7 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 			
 			# If no breakpoints with good quality could be found inside our region, the old SV wiil be written to our new vcf
 			if sv_type == 'N/A':
-				f_out = write(line + '\n') 
+				f_out.write(line) 
 				continue
 
 			# Manipulate line with new improved SV information
@@ -159,8 +159,9 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 			contig_l = sv_info[9]
 			contig_seq = sv_info[10]
 
-			glenX_stats = '{}|{}|{}|{}|{}|{}|{}'.format(contig_l, contig_seq, statistics['r_i_norm'], statistics['r_i'], statistics['m_all_at'], statistics['gc_content'], statistics['map_i'] ) # contig length, seq, normalized read ceverage, raw read-coverage, gc-content and mappabilty score
-			
+			# contig length, seq, normalized read ceverage, raw read-coverage, gc-content and mappabilty score
+			glenX_stats = '{}|{}|{}|{}|{}|{}|{}'.format(contig_l, contig_seq, statistics['r_i_norm'], statistics['r_i'], statistics['m_all_at'], statistics['gc_content'], statistics['map_i'] ) 
+
 			if sv_type == 'BND':
 			 	split_line[7] = 'SVTYPE=BND;GlenX={}'.format(GlenX_stats) #;CHRA=' + chromA  + ';CHRB=split_line[7] = 'SVTYPE=BND' #;CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] ' + chromB + ';END=' + sv_info[7] # mating breakpoint 
 				split_line[4] = 'N[{}:{}[' .format(chromB, sv_info[7])
@@ -179,6 +180,7 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 # START GLENX
 #======================================================================================================
 
+print 'Starts GlenX..'
 db = read_cov_db(ID, tab)
 print 'The database: ', db, 'is completed'	
 assembly = region_specific_assembly (vcf, bam, ID, db, bwa_ref)
