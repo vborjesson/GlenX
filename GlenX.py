@@ -74,7 +74,7 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 					info_field = True 
 				else: 
 					if info_field == True:
-						info_GlenX = "##INFO=<ID=GlenX,Number=7,Type=Float,Description='contig length, contig sequence, normalized breakpoint read-coverage (100bp), averaage read coverage for all regions above mappability threshold 0.9, raw breakpoint read-coverage (100bp), gc-content(ref) and mappability-score(ref)'"
+						info_GlenX = "##INFO=<ID=GlenX,Number=8,Type=Float,Description='contig length, contig sequence, normalized breakpoint read-coverage (100bp), averaage read coverage for all regions above mappability threshold 0.9, raw breakpoint read-coverage (100bp), gc-content(ref) and mappability-score(ref), genotype2 (using read-coverage information)'"
 						info_field = False
 				continue 
 			else:
@@ -141,7 +141,7 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 				os.system(" ".join(process))
 				sam = '{}/{}_mapped.sam' .format(assembly_map, region_ID)
 
-			sv_info, genotype, sv_type, statistics = call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, db)	
+			sv_info, genotype1, genotype2, sv_type, statistics = call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, db)	
 			
 			# If no breakpoints with good quality could be found inside our region, the old SV wiil be written to our new vcf
 			if sv_type == 'N/A':
@@ -155,18 +155,20 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 			split_line[2] = 'SV_GlenX_{}'.format(str(ID_counter))
 			split_line[4] = sv_type
 			split_line[6] = 'PASS'
+			split_line[8] = '{}::'.format (genotype1)
 			
 			contig_l = sv_info[9]
 			contig_seq = sv_info[10]
 
-			# contig length, seq, normalized read ceverage, raw read-coverage, gc-content and mappabilty score
-			glenX_stats = '{}|{}|{}|{}|{}|{}|{}'.format(contig_l, contig_seq, statistics['r_i_norm'], statistics['r_i'], statistics['m_all_at'], statistics['gc_content'], statistics['map_i'] ) 
+			# INFO-field: contig length, seq, normalized read ceverage, raw read-coverage, gc-content and mappabilty score
+			glenX_stats = '{}|{}|{}|{}|{}|{}|{}|{}'.format(contig_l, contig_seq, statistics['r_i_norm'], statistics['r_i'], statistics['m_all_at'], statistics['gc_content'], statistics['map_i'], genotype2) 
+			old_info = split_line[7]
 
 			if sv_type == 'BND':
-			 	split_line[7] = 'SVTYPE=BND;GlenX={}'.format(GlenX_stats) #;CHRA=' + chromA  + ';CHRB=split_line[7] = 'SVTYPE=BND' #;CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] ' + chromB + ';END=' + sv_info[7] # mating breakpoint 
-				split_line[4] = 'N[{}:{}[' .format(chromB, sv_info[7])
+			 	split_line[7] = 'SVTYPE=BND;GlenX={};{}'.format(GlenX_stats, old_info) #;CHRA=' + chromA  + ';CHRB=split_line[7] = 'SVTYPE=BND' #;CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] ' + chromB + ';END=' + sv_info[7] # mating breakpoint 
+				split_line[4] = 'N[{}:{}[' .format(chromB, sv_info[6])
 			elif sv_type != 'BND':
-				split_line[7] = 'SVTYPE={};CHRA={};CHRB={};END={}GlenX={}'.format(sv_type, chromA, chromB, sv_info[7], GlenX_stats) #'SVTYPE=' + sv_type + ';CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] 
+				split_line[7] = 'SVTYPE={};GlenX={};{}'.format(sv_type, GlenX_stats, old_info) #'SVTYPE=' + sv_type + ';CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] 
 			split_line[-1] = genotype	
 			
 			vcf_sv = '\t'.join(split_line) # make new tab seperated line of list, (preparations for writing to vcf-file) 

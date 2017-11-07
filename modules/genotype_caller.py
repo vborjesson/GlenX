@@ -139,7 +139,7 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 			if row[1] == best_breakpoint[1] and best_breakpoint[2] > row[2] and best_breakpoint[2] < row[3]:
 				genotype = "0/1"
 		if genotype == "":
-			genotype = "1/1"
+			genotype1 = "1/1"
 
 		# Get statistics from GlenX.db and read_cov.db
 		statistics = get_stats(db, chromA, breakA)
@@ -156,9 +156,26 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 			if best_breakpoint[0] != best_breakpoint[5]: # sequences are in opposite directions -> inversed  
 				sv_type = "INV"
 			else: 
-				# DEL
-				# DUP
-				sv_type = "improving code"	
+				# DELETION
+				if statistics['r_i_norm'] < (0.25*statistics['m_all_at']):
+					sv_type = "DEL"
+					genotype2 = "1/1"
+				if statistics['r_i_norm'] >= (0.25*statistics['m_all_at']):
+					if statistics['r_i_norm'] <= (0.75*statistics['m_all_at']):
+						sv_type = "DEL"
+						genotype2 = "0/1"
+				# DUPLICATION	
+				if statistics['r_i_norm'] >= (1.25*statistics['m_all_at']):	
+					if statistics['r_i_norm'] < (1.75*statistics['m_all_at']):	
+						sv_type = "DUP"
+						genotype2 = "0/1"
+					if statistics['r_i_norm'] >= (1.75*statistics['m_all_at']):	
+						sv_type = "DUP"
+						genotype2 = "1/1"
+				else:
+					sv_type = "UNK"		
+
+				
 	
-		return best_breakpoint, genotype, sv_type, statistics
+		return best_breakpoint, genotype1, genotype2, sv_type, statistics
 
