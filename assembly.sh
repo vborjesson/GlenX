@@ -26,7 +26,8 @@ samtools view -h -F 2048 $3_bam/$4.bam | samtools view -ShF 1024 - | samtools vi
 
 # See if SVs in x_presplit.sam is in the correct region. This is a prefilter before consensus.
 python modules/check_region.py --sam $3_consensus/$4_presplits.sam --region1 $2 --region2 $7 --out $3_consensus/$4_splits.sam
-python consensus.py $3_consensus $3_consensus/$4_splits.sam > $3_consensus/$4_consensus.fa
+mkdir $3_consensus/$4_consensus
+python consensus.py $3_consensus/$4_consensus $3_consensus/$4_splits.sam > $3_consensus/$4_consensus.fa
 
 # make de novo assembly with three different kmer sizes; 30, 50 and 70
 ABYSS -k 30 -c 3 -o $3_assembly/$4_30_1_contig.fa $3_fasta/$4.fasta

@@ -34,6 +34,9 @@ def read_cov_db (ID, tab_file):
 def median_cov (db_path):
 	db = sqlite3.connect(db_path)
 	cursor_o = db.cursor()
-	med_cov = cursor_o.execute('''SELECT avg(read_coverage) FROM read_cov where read_coverage > ?''', (0,)).fetchone()[0]
+	cursor_o.execute('''SELECT avg(read_coverage) FROM read_cov where read_coverage > ?''', (0,))
+	med_cov = cursor_o.fetchone()[0]
+	if med_cov is None:
+		med_cov = 20
 	db.commit()
 	return med_cov

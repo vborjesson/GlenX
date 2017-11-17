@@ -102,7 +102,7 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 							region = True
 
 					if region: # If region is True, save to array
-						seq = line[8]
+						seq = line[9]
 						s_arr = np.append(s_arr, np.array([[strandA, alt_chrA, breakA, map_scoreA, strandB, alt_chrB, breakB, map_scoreB, cigar_length, int(contig_l), seq]]), axis=0)	
 
 				# Matched contig 		 
@@ -116,45 +116,92 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 
 	# if no breakpoints could be found, skip this variant!					
 	if len(s_arr) == 0:
-		#print 'no breakpoints could be found'
-		return s_arr, 'N/A', 'N/A', 'N/A' # returns N/A in order to continue the loop
+		print 'No SV could be found using de novo assembly. Checking if read coverage information could be used to classify DEL, DUP and genotype'
+		sv_type = ""
+		genotype2 = ""
+		if chromA == chromB:
+			st_pos = posA_start + 1000
+			end_pos = posB_start + 1000
+			if st_pos < end_pos:
+				pos_region = '{}|{}'.format(st_pos, end_pos)
+			if st_pos > end_pos:
+				pos_region = '{}|{}'.format(end_pos, st_pos)
+			statistics = get_stats(db, chromA, pos_region)
+			print 'statistics:', statistics
+
+			# DELETION
+			if statistics['r_i_norm'] < (0.25*statistics['m_all_at']):
+				sv_type = "DEL"
+				genotype2 = "1/1"
+			if statistics['r_i_norm'] >= (0.25*statistics['m_all_at']):
+				if statistics['r_i_norm'] <= (0.75*statistics['m_all_at']):
+					sv_type = "DEL"
+					genotype2 = "0/1"
+			# DUPLICATION	
+			if statistics['r_i_norm'] >= (1.25*statistics['m_all_at']):	
+				if statistics['r_i_norm'] < (1.75*statistics['m_all_at']):	
+					sv_type = "DUP"
+					genotype2 = "0/1"
+				if statistics['r_i_norm'] >= (1.75*statistics['m_all_at']):	
+					sv_type = "DUP"
+					genotype2 = "1/1"
+			if sv_type != "" and genotype2 != "":		
+				sv_info = [chromA, st_pos, end_pos] 
+				# add genotype2 to star dictionary
+				statistics['genotype2'] = genotype2			
+
+				return sv_info, genotype2, sv_type, statistics	
+			else:
+				return s_arr, 'N/A', 'N/A', 'N/A'					
+
+		else:
+			return s_arr, 'N/A', 'N/A', 'N/A' # returns N/A in order to continue the loop
 
 	elif len(s_arr) > 0: # if one or more breakpoint was found		
 	# If several predicted SVs in s_arr; compare them and choose the one that seems most trustworthy. 
 	# Use map_score, cigar length, contig length and read coverage over breakpoints.
 		if len(s_arr) > 1:
 			# Best breakpoint will be the one with largest mapped contig. 
-			seq_col = s_arr[:,10]
+			seq_col = s_arr[:,9]
 			seq_col = seq_col.astype(np.int)
 			best_bp_number = np.argmax(seq_col)
-			best_breakpoint = s_arr[best_bp_number]
+			best_breakpoint = s_arr[best_bp_number]			
 
 		if len(s_arr) == 1:
 			best_breakpoint = s_arr[0]		
 
 		# Check if there is a matching contig to ref that will span over the predicted breakpoint. If there is; The genotype will be 
 		# classified as heterozygous. If we can't find any matching contig spanning the breakpoint, we classify this as homozygous  
-		genotype = ""
+		genotype1 = ""
 		for row in m_arr:
 			if row[1] == best_breakpoint[1] and best_breakpoint[2] > row[2] and best_breakpoint[2] < row[3]:
-				genotype = "0/1"
-		if genotype == "":
+				genotype1 = "0/1"
+		if genotype1 == "":
 			genotype1 = "1/1"
 
 		# Get statistics from GlenX.db and read_cov.db
-		statistics = get_stats(db, chromA, breakA)
+		statistics = get_stats(db, best_breakpoint[1], best_breakpoint[2])
+
+		# If there is no information about read coverage, skipp this variant
+		if len(statistics) == 0:
+			return s_arr, 'N/A', 'N/A', statistics
+
 		stat_map_score = statistics['map_i']
 
 		# mappability threshold, we do not want to keep SVs who have a low mappability score = no support for SV.  
-		if stat_map_score  < 0.9:
+		if stat_map_score  < 0.5:
 			return s_arr, 'N/A', 'N/A', statistics 
 
 		# classify SV. 	
-		if best_breakpoint[1] != best_breakpoint[6]: # breakpoints are located on different chromosomes -> break end
+		if best_breakpoint[1] != best_breakpoint[5]: # breakpoints are located on different chromosomes -> break end
 			sv_type = "BND"
-		if best_breakpoint[1] == best_breakpoint[6]: # breakpoints are located on the same chromosome
-			if best_breakpoint[0] != best_breakpoint[5]: # sequences are in opposite directions -> inversed  
+			genotype2 = "none"
+			
+		if best_breakpoint[1] == best_breakpoint[5]: # breakpoints are located on the same chromosome
+			if best_breakpoint[0] != best_breakpoint[4]: # sequences are in opposite directions -> inversed  
 				sv_type = "INV"
+				genotype2 = "none"
+			
 			else: 
 				# DELETION
 				if statistics['r_i_norm'] < (0.25*statistics['m_all_at']):
@@ -173,9 +220,13 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 						sv_type = "DUP"
 						genotype2 = "1/1"
 				else:
-					sv_type = "UNK"		
+					sv_type = "BND"	
+					genotype2 = "none"	
+
+		# add genotype2 to star dictionary
+		statistics['genotype2'] = genotype2			
 
 				
 	
-		return best_breakpoint, genotype1, genotype2, sv_type, statistics
+		return best_breakpoint, genotype1, sv_type, statistics
 

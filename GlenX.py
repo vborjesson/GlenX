@@ -69,13 +69,14 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 		info_field = False
 		for line in vcf_in:
 			if line.startswith("##"):
-				f_out.write(line + "\n")
 				if line.startswith("##INFO"):
 					info_field = True 
 				else: 
 					if info_field == True:
-						info_GlenX = "##INFO=<ID=GlenX,Number=8,Type=Float,Description='contig length, contig sequence, normalized breakpoint read-coverage (100bp), averaage read coverage for all regions above mappability threshold 0.9, raw breakpoint read-coverage (100bp), gc-content(ref) and mappability-score(ref), genotype2 (using read-coverage information)'"
+						info_GlenX = "##INFO=<ID=GlenX,Number=8,Type=Float,Description='contig_length|contig_sequence|normalized_breakpoint|read_coverage_(100bp)|average_read_coverage_for_all_regions_above_mappability_threshold_0.5|raw_breakpoint_read_coverage_(100bp)|gc-content(ref)|mappability-score(ref)|genotype2_(using_read-coverage_information)'"
+						f_out.write(info_GlenX + '\n')
 						info_field = False
+				f_out.write(line)		
 				continue 
 			else:
 				split_line=line.lower().replace("chr","").split("\t")
@@ -133,47 +134,67 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 				# median chromosome coverage divided in four, will give us a threshold of minimum read coverage that will be returned
 				cov_med = median_cov (db)
 				# minimum kmer coverage for de novo assembly
-				min_cov = cov_med / 4
+				min_cov = int(cov_med) / 4
 				print 'Minimum coverage accepted: ', min_cov
 				print 'Initiate de novo assembly and mapping contigs back to reference'
 				#print 'region1-2', region, region2
-				process = ['./assembly.sh', bam, region, ID, region_ID, str(min_cov), bwa_ref, region2]
+				process = ['./assembly.sh', bam, region, ID, region_ID, str(min_cov), bwa_ref, region2, '>/dev/null']
 				os.system(" ".join(process))
 				sam = '{}/{}_mapped.sam' .format(assembly_map, region_ID)
 
-			sv_info, genotype1, genotype2, sv_type, statistics = call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, db)	
+			print sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, db	
+			sv_info, genotype1, sv_type, statistics = call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, db)	
 			
 			# If no breakpoints with good quality could be found inside our region, the old SV wiil be written to our new vcf
 			if sv_type == 'N/A':
-				f_out.write(line) 
+				f_out.write(line.upper()) 
 				continue
 
-			# Manipulate line with new improved SV information
-			ID_counter += 1
-			split_line[0] = chromA
-			split_line[1] = sv_info[2] # Breakpoint for SV
-			split_line[2] = 'SV_GlenX_{}'.format(str(ID_counter))
-			split_line[4] = sv_type
-			split_line[6] = 'PASS'
-			split_line[8] = '{}::'.format (genotype1)
-			
-			contig_l = sv_info[9]
-			contig_seq = sv_info[10]
+			# If SV classification have been done using read_coverage over region
+			if len(sv_info) == 3:
+				ID_counter += 1
+				split_line[0] = chromA
+				split_line[1] = str(sv_info[1]) # start_pos
+				split_line[2] = 'SV_GlenX_{}'.format(str(ID_counter))	
+				split_line[4] = '<{}>'.format(sv_type)
+				split_line[6] = 'PASS'
+				split_line[9] = '{}::'.format (genotype1)
+				GlenX_stats = '{}|{}|{}|{}|{}|{}|{}|{}'.format('None', 'None', statistics['r_i_norm'], statistics['r_i'], statistics['m_all_at'], statistics['gc_content'], statistics['map_i'], statistics['genotype2'])
+				sv_len = int(sv_info[1]) - int(sv_info[2])
+				old_info = split_line[7]
+				split_line[7] = 'END={};SVTYPE={};SVLEN={};GlenX={};{}'.format(sv_info[2], sv_type, sv_len, GlenX_stats, old_info)				
 
-			# INFO-field: contig length, seq, normalized read ceverage, raw read-coverage, gc-content and mappabilty score
-			glenX_stats = '{}|{}|{}|{}|{}|{}|{}|{}'.format(contig_l, contig_seq, statistics['r_i_norm'], statistics['r_i'], statistics['m_all_at'], statistics['gc_content'], statistics['map_i'], genotype2) 
-			old_info = split_line[7]
+			else:	
+				# Manipulate line with new improved SV information
+				ID_counter += 1
+				split_line[0] = str(chromA)
+				split_line[1] = str(sv_info[2]) # Breakpoint for SV
+				split_line[2] = 'SV_GlenX_{}'.format(str(ID_counter))
+				split_line[4] = '<{}>'.format(sv_type)
+				split_line[6] = 'PASS'
+				split_line[9] = '{}::'.format (genotype1)
+				
+				contig_l = sv_info[9]
+				contig_seq = sv_info[10]
+				sv_len = int(sv_info[2]) - int(sv_info[6])
 
-			if sv_type == 'BND':
-			 	split_line[7] = 'SVTYPE=BND;GlenX={};{}'.format(GlenX_stats, old_info) #;CHRA=' + chromA  + ';CHRB=split_line[7] = 'SVTYPE=BND' #;CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] ' + chromB + ';END=' + sv_info[7] # mating breakpoint 
-				split_line[4] = 'N[{}:{}[' .format(chromB, sv_info[6])
-			elif sv_type != 'BND':
-				split_line[7] = 'SVTYPE={};GlenX={};{}'.format(sv_type, GlenX_stats, old_info) #'SVTYPE=' + sv_type + ';CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] 
-			split_line[-1] = genotype	
-			
+				# INFO-field: contig length, seq, normalized read ceverage, raw read-coverage, gc-content and mappabilty score
+				GlenX_stats = '{}|{}|{}|{}|{}|{}|{}|{}'.format(contig_l, contig_seq, statistics['r_i_norm'], statistics['r_i'], statistics['m_all_at'], statistics['gc_content'], statistics['map_i'], statistics['genotype2']) 
+				old_info = split_line[7]
+
+				if sv_type == 'BND':
+				 	split_line[7] = 'SVTYPE=BND;GlenX={};{}'.format(GlenX_stats, old_info) #;CHRA=' + chromA  + ';CHRB=split_line[7] = 'SVTYPE=BND' #;CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] ' + chromB + ';END=' + sv_info[7] # mating breakpoint 
+					split_line[4] = 'N[{}:{}[' .format(chromB, sv_info[6])
+				elif sv_type != 'BND':
+					if sv_type == "DEL":
+						split_line[7] = 'END={};SVTYPE={};SVLEN={};GlenX={};{}'.format(sv_info[6], sv_type, sv_len, GlenX_stats, old_info) #'SVTYPE=' + sv_type + ';CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] 
+					if sv_type == "DUP" or sv_type == "INV":
+						split_line[7] = 'SVTYPE={};END={};GlenX={};{}'.format(sv_type, sv_info[6], GlenX_stats, old_info)
+
+				
 			vcf_sv = '\t'.join(split_line) # make new tab seperated line of list, (preparations for writing to vcf-file) 
 			string = str(vcf_sv)
-			f_out.write(string + "\n")
+			f_out.write(string.upper() + "\n")
 
 	return 'All variants in the vcf-file have been assembled, mapped and analyzed.'		
 
