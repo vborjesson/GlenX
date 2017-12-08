@@ -114,7 +114,7 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 					match_region_end += count_match_pos	
 					m_arr = np.append(m_arr, np.array([[strandA, alt_chrA, match_region_start, match_region_end]]), axis=0)				
 
-	# if no breakpoints could be found, skip this variant!					
+	# if no breakpoints could be found.				
 	if len(s_arr) == 0:
 		print 'No SV could be found using de novo assembly. Checking if read coverage information could be used to classify DEL, DUP and genotype'
 		sv_type = ""
@@ -158,8 +158,7 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 			return s_arr, 'N/A', 'N/A', 'N/A' # returns N/A in order to continue the loop
 
 	elif len(s_arr) > 0: # if one or more breakpoint was found		
-	# If several predicted SVs in s_arr; compare them and choose the one that seems most trustworthy. 
-	# Use map_score, cigar length, contig length and read coverage over breakpoints.
+	# If several predicted SVs in s_arr; use the one with longest contig
 		if len(s_arr) > 1:
 			# Best breakpoint will be the one with largest mapped contig. 
 			seq_col = s_arr[:,9]
@@ -207,12 +206,12 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 				if statistics['r_i_norm'] < (0.25*statistics['m_all_at']):
 					sv_type = "DEL"
 					genotype2 = "1/1"
-				if statistics['r_i_norm'] >= (0.25*statistics['m_all_at']):
+				elif statistics['r_i_norm'] >= (0.25*statistics['m_all_at']):
 					if statistics['r_i_norm'] <= (0.75*statistics['m_all_at']):
 						sv_type = "DEL"
 						genotype2 = "0/1"
 				# DUPLICATION	
-				if statistics['r_i_norm'] >= (1.25*statistics['m_all_at']):	
+				elif statistics['r_i_norm'] >= (1.25*statistics['m_all_at']):	
 					if statistics['r_i_norm'] < (1.75*statistics['m_all_at']):	
 						sv_type = "DUP"
 						genotype2 = "0/1"
@@ -223,7 +222,7 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 					sv_type = "BND"	
 					genotype2 = "none"	
 
-		# add genotype2 to star dictionary
+		# add genotype2 to stat dictionary
 		statistics['genotype2'] = genotype2			
 
 				

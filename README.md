@@ -6,8 +6,7 @@ Tool for better genotyping of whole genome sequencing (WGS) data.
 Takes an vcf, bam and tab-file with read depth per 100 bp as input. 
 
 dependencies: 
-	GlenX uses three different assembly tools for de novo assemly and mapping; abyss, velveth, SSAKE, BWA and samtools. All these softwares needs to be installed. 
-	You will also need a SQlite-database with reference genome GC-content and mappability score / 100bp. Look at; Create database. 
+
 ```
 ABySS
 SSAKE
@@ -15,7 +14,7 @@ velvet
 BWA
 samtools
 clustalw
-GlenX_DB
+GlenX_DB (look futher down in this readme)
 consensus (https://github.com/J35P312/SplitVision) 
 ```
 
@@ -26,25 +25,15 @@ Statistics are needed to confirm and support the new predicted genotype and SV-t
 ```
 python GlenX_DB.py --hg19 /path/to/refgenome --bed /path/to/bedGraph
 ```
-This will create GlenX.db SQL database in the GlenX directory
+This will create GlenX.db SQL database in the GlenX directory, takes about 2 hours.
 
 ## Run GlenX
 ```
-python GlenX --vcf --bam --tab --bwa_ref --norm_db
+python GlenX.py --vcf --bam --tab --bwa_ref --GLEN_db --ID
 ```
-This will generate a vcf file with new predicted breakpoints, genotyping and SV classification. 
+This will generate a vcf file with new predicted breakpoints, genotyping predictions.
 
-2017 - 10 - 23
 
-GlenX_DB is done. 
-Now im trying to figure out how to normalize the data from two databases. So far; I select what I want from the two databases where they are joined. 
-According to this formula: 
-	r_i_norm = r_i * m_all / m_gc 
-	where:
-	r_i_norm is the normaliized red coverage
-	r_i is the cittent read coverage
-	m_all is the average read_coverage
-	m_gc is the read coverage for all regions with the same gc-content
 
 
 

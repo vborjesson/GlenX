@@ -16,6 +16,7 @@ from coverage_db import median_cov
 from genotype_caller import call_genotype
 from cigar import cigar_count
 from check_bam_flag import bam_flag
+from vcf_info import create_info
 from scipy.stats import norm
 #import pandas as pd
 
@@ -62,7 +63,9 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 	subprocess.call('chmod +x assembly.sh', shell=True)
 
 	file_name = '{}{}{}{}'.format(ID, '_GlenX_out/', ID, '_GlenX.vcf')
-	
+
+	valid_chrom = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y']
+
 	with open (vcf, "r") as vcf_in, open (file_name, 'w') as f_out:
 		print 'Reading VCF for region-specific assembly'
 		ID_counter = 0 # all SVs will have I uniqe number
@@ -80,9 +83,18 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 				continue 
 			else:
 				split_line=line.lower().replace("chr","").split("\t")
+				
 				if len(split_line) <= 6: # This SV do not have all the correct information and will therefor not be analyzed 
+					f_out.write(line.upper())
 					continue
+
 				chromA = split_line[0]
+
+				if chromA not in valid_chrom: # if the chromosome is not one of the usual -> skip 
+					#print line
+					f_out.write(line.upper()) 
+					continue
+
 				posA = split_line[1]
 				posB = 0
 				tags = split_line[7].split(";")
@@ -97,6 +109,7 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 						chromB = alt_column[0]
 						posB = alt_column[1]
 				if posB == 0: # No secondary mapping have been found; continue with next SV
+					f_out.write(line.upper()) 
 					continue	
 
 				# unique ID for every region-specific bam-file	
@@ -117,6 +130,7 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 					if posA < posB:
 						if posA_end >= posB_start: # overlapping region
 							region = '{}:{}-{}'.format(str(chromA), str(posA_start), str(posB_end))
+							region2 = '{}:{}-{}'.format(str(chromA), 0,0)
 						else: 
 							region = '{}:{}-{}'.format(str(chromA), str(posA_start), str(posA_end)) 
 							region2 = '{}:{}-{}'.format(str(chromB), str(posB_start), str(posB_end))
@@ -124,6 +138,7 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 					if posA > posB:
 						if posB_end >= posA_start:
 							region = '{}:{}-{}'.format(str(chromA), str(posB_start), str(posA_end))
+							region2 = '{}:{}-{}'.format(str(chromA), 0,0)
 						else:
 							region = '{}:{}-{}'.format(str(chromA), str(posA_start), str(posA_end)) 
 							region2 = '{}:{}-{}'.format(str(chromB), str(posB_start), str(posB_end))				
@@ -158,11 +173,12 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 				split_line[2] = 'SV_GlenX_{}'.format(str(ID_counter))	
 				split_line[4] = '<{}>'.format(sv_type)
 				split_line[6] = 'PASS'
-				split_line[9] = '{}::'.format (genotype1)
-				GlenX_stats = '{}|{}|{}|{}|{}|{}|{}|{}'.format('None', 'None', statistics['r_i_norm'], statistics['r_i'], statistics['m_all_at'], statistics['gc_content'], statistics['map_i'], statistics['genotype2'])
+				split_line[8] = 'GT'
+				split_line[9] = '{}'.format (genotype1)
+				GlenX_stats = '{}|{}|{}|{}|{}|{}|{}|{}'.format('N/A', 'N/A', statistics['r_i_norm'], statistics['r_i'], statistics['m_all_at'], statistics['gc_content'], statistics['map_i'], statistics['genotype2'])
 				sv_len = int(sv_info[1]) - int(sv_info[2])
 				old_info = split_line[7]
-				split_line[7] = 'END={};SVTYPE={};SVLEN={};GlenX={};{}'.format(sv_info[2], sv_type, sv_len, GlenX_stats, old_info)				
+				glen_info = 'END={};SVTYPE={};SVLEN={};GlenX={}'.format(sv_info[2], sv_type, sv_len, GlenX_stats)				
 
 			else:	
 				# Manipulate line with new improved SV information
@@ -172,7 +188,8 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 				split_line[2] = 'SV_GlenX_{}'.format(str(ID_counter))
 				split_line[4] = '<{}>'.format(sv_type)
 				split_line[6] = 'PASS'
-				split_line[9] = '{}::'.format (genotype1)
+				split_line[8] = 'GT'
+				split_line[9] = '{}'.format (genotype1)
 				
 				contig_l = sv_info[9]
 				contig_seq = sv_info[10]
@@ -183,15 +200,18 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 				old_info = split_line[7]
 
 				if sv_type == 'BND':
-				 	split_line[7] = 'SVTYPE=BND;GlenX={};{}'.format(GlenX_stats, old_info) #;CHRA=' + chromA  + ';CHRB=split_line[7] = 'SVTYPE=BND' #;CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] ' + chromB + ';END=' + sv_info[7] # mating breakpoint 
+				 	glen_info = 'SVTYPE=BND;GlenX={}'.format(GlenX_stats) #;CHRA=' + chromA  + ';CHRB=split_line[7] = 'SVTYPE=BND' #;CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] ' + chromB + ';END=' + sv_info[7] # mating breakpoint 
 					split_line[4] = 'N[{}:{}[' .format(chromB, sv_info[6])
 				elif sv_type != 'BND':
 					if sv_type == "DEL":
-						split_line[7] = 'END={};SVTYPE={};SVLEN={};GlenX={};{}'.format(sv_info[6], sv_type, sv_len, GlenX_stats, old_info) #'SVTYPE=' + sv_type + ';CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] 
+						glen_info = 'END={};SVTYPE={};SVLEN={};GlenX={}'.format(sv_info[6], sv_type, sv_len, GlenX_stats) #'SVTYPE=' + sv_type + ';CHRA=' + chromA  + ';CHRB=' + chromB + ';END=' + sv_info[7] 
 					if sv_type == "DUP" or sv_type == "INV":
-						split_line[7] = 'SVTYPE={};END={};GlenX={};{}'.format(sv_type, sv_info[6], GlenX_stats, old_info)
+						glen_info = 'SVTYPE={};END={};GlenX={}'.format(sv_type, sv_info[6], GlenX_stats)
 
-				
+			info = create_info(old_info, glen_info)		
+			split_line[7] = info
+
+			print 'Variant updated in vcf-file'
 			vcf_sv = '\t'.join(split_line) # make new tab seperated line of list, (preparations for writing to vcf-file) 
 			string = str(vcf_sv)
 			f_out.write(string.upper() + "\n")
