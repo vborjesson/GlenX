@@ -76,7 +76,7 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 					info_field = True 
 				else: 
 					if info_field == True:
-						info_GlenX = "##INFO=<ID=GlenX,Number=8,Type=Float,Description='contig_length|contig_sequence|normalized_breakpoint|read_coverage_(100bp)|average_read_coverage_for_all_regions_above_mappability_threshold_0.5|raw_breakpoint_read_coverage_(100bp)|gc-content(ref)|mappability-score(ref)|genotype2_(using_read-coverage_information)'"
+						info_GlenX = "##INFO=<ID=GlenX,Number=8,Type=Float,Description='contig_length|contig_sequence|de_novo_tool|normalized_breakpoint|read_coverage_(100bp)|average_read_coverage_for_all_regions_above_mappability_threshold_0.5|raw_breakpoint_read_coverage_(100bp)|gc-content(ref)|mappability-score(ref)|genotype2_(using_read-coverage_information)|denovo_tool'"
 						f_out.write(info_GlenX + '\n')
 						info_field = False
 				f_out.write(line)		
@@ -193,10 +193,11 @@ def region_specific_assembly (vcf, bam, ID, db, bwa_ref):
 				
 				contig_l = sv_info[9]
 				contig_seq = sv_info[10]
+				de_novo_tool = sv_info[11]
 				sv_len = int(sv_info[2]) - int(sv_info[6])
 
 				# INFO-field: contig length, seq, normalized read ceverage, raw read-coverage, gc-content and mappabilty score
-				GlenX_stats = '{}|{}|{}|{}|{}|{}|{}|{}'.format(contig_l, contig_seq, statistics['r_i_norm'], statistics['r_i'], statistics['m_all_at'], statistics['gc_content'], statistics['map_i'], statistics['genotype2']) 
+				GlenX_stats = '{}|{}|{}|{}|{}|{}|{}|{}|{}'.format(contig_l, contig_seq, de_novo_tool, statistics['r_i_norm'], statistics['r_i'], statistics['m_all_at'], statistics['gc_content'], statistics['map_i'], statistics['genotype2']) 
 				old_info = split_line[7]
 
 				if sv_type == 'BND':

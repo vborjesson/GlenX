@@ -16,7 +16,7 @@ from statistics import get_stats
 #===================================================================================================
 
 def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_end, db):
-	s_arr = np.empty((0,11), int) # Soft clipping alignment
+	s_arr = np.empty((0,12), int) # Soft clipping alignment
 	m_arr = np.empty((0,4), int) # matched alignment
 	with open (sam, "r") as sam_in:
 
@@ -34,6 +34,7 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 
 			else:
 				line = line.upper().rstrip().split("\t")
+				denovo_tool = line[0] 
 				alt_chrA = str(line[2])
 				if '.' in alt_chrA: # if the chromosome number contain a "." , it will be invalid and we will continue with next SV
 					continue
@@ -103,7 +104,7 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 
 					if region: # If region is True, save to array
 						seq = line[9]
-						s_arr = np.append(s_arr, np.array([[strandA, alt_chrA, breakA, map_scoreA, strandB, alt_chrB, breakB, map_scoreB, cigar_length, int(contig_l), seq]]), axis=0)	
+						s_arr = np.append(s_arr, np.array([[strandA, alt_chrA, breakA, map_scoreA, strandB, alt_chrB, breakB, map_scoreB, cigar_length, int(contig_l), seq, denovo_tool]]), axis=0)	
 
 				# Matched contig 		 
 				elif "M" in cigar:
@@ -191,41 +192,39 @@ def call_genotype (sam, chromA, chromB, posA_start, posA_end, posB_start, posB_e
 		if stat_map_score  < 0.5:
 			return s_arr, 'N/A', 'N/A', statistics 
 
-		# classify SV. 	
-		if best_breakpoint[1] != best_breakpoint[5]: # breakpoints are located on different chromosomes -> break end
-			sv_type = "BND"
-			genotype2 = "none"
-			
-		if best_breakpoint[1] == best_breakpoint[5]: # breakpoints are located on the same chromosome
-			if best_breakpoint[0] != best_breakpoint[4]: # sequences are in opposite directions -> inversed  
-				sv_type = "INV"
+		# classify SV. 
+		else:	
+			if best_breakpoint[1] != best_breakpoint[5]: # breakpoints are located on different chromosomes -> break end
+				sv_type = "BND"
 				genotype2 = "none"
-			
-			else: 
-				# DELETION
-				if statistics['r_i_norm'] < (0.25*statistics['m_all_at']):
-					sv_type = "DEL"
-					genotype2 = "1/1"
-				elif statistics['r_i_norm'] >= (0.25*statistics['m_all_at']):
-					if statistics['r_i_norm'] <= (0.75*statistics['m_all_at']):
+				
+			if best_breakpoint[1] == best_breakpoint[5]: # breakpoints are located on the same chromosome
+				if best_breakpoint[0] != best_breakpoint[4]: # sequences are in opposite directions -> inversed  
+					sv_type = "INV"
+					genotype2 = "none"
+				
+				else: 
+					# DELETION
+					if statistics['r_i_norm'] < (0.25*statistics['m_all_at']):
+						sv_type = "DEL"
+						genotype2 = "1/1"
+					elif statistics['r_i_norm'] >= (0.25*statistics['m_all_at']) and statistics['r_i_norm'] <= (0.75*statistics['m_all_at']):
 						sv_type = "DEL"
 						genotype2 = "0/1"
-				# DUPLICATION	
-				elif statistics['r_i_norm'] >= (1.25*statistics['m_all_at']):	
-					if statistics['r_i_norm'] < (1.75*statistics['m_all_at']):	
-						sv_type = "DUP"
-						genotype2 = "0/1"
-					if statistics['r_i_norm'] >= (1.75*statistics['m_all_at']):	
-						sv_type = "DUP"
-						genotype2 = "1/1"
-				else:
-					sv_type = "BND"	
-					genotype2 = "none"	
+					# DUPLICATION	
+					elif statistics['r_i_norm'] >= (1.25*statistics['m_all_at']):	
+						if statistics['r_i_norm'] < (1.75*statistics['m_all_at']):	
+							sv_type = "DUP"
+							genotype2 = "0/1"
+						if statistics['r_i_norm'] >= (1.75*statistics['m_all_at']):	
+							sv_type = "DUP"
+							genotype2 = "1/1"
+					else:
+						sv_type = "BND"	
+						genotype2 = "none"	
 
-		# add genotype2 to stat dictionary
-		statistics['genotype2'] = genotype2			
+			# add genotype2 to stat dictionary
+			statistics['genotype2'] = genotype2			
 
-				
-	
-		return best_breakpoint, genotype1, sv_type, statistics
+			return best_breakpoint, genotype1, sv_type, statistics
 
